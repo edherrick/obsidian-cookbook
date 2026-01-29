@@ -1,8 +1,28 @@
-/*
+.btn {
+	--btn-font-size: 1.05rem;
+	--btn-icon-size: 20px;
+	--btn-padding-y: 0.75rem;
+	--btn-padding-x: 1.25rem;
 
-This CSS file will be included with your plugin, and
-available in the app when your plugin is enabled.
+	font-size: var(--btn-font-size);
+	padding: var(--btn-padding-y) var(--btn-padding-x);
+	display: inline-flex;
+	align-items: center;
+	gap: 0.6rem;
+}
 
-If your plugin does not need CSS, delete this file.
+.btn-icon svg {
+	width: var(--btn-icon-size);
+	height: var(--btn-icon-size);
+}
 
-*/
+.btn-label {
+	white-space: nowrap;
+}
+
+.btn-row{
+    display: flex;
+    justify-content: center;
+    gap: 0.7rem;
+    margin-bottom: auto;
+}

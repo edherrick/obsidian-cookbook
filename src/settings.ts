@@ -1,36 +1,43 @@
-import {App, PluginSettingTab, Setting} from "obsidian";
-import MyPlugin from "./main";
+import { App, PluginSettingTab, Setting } from "obsidian";
+import CookbookPlugin from "./main";
 
-export interface MyPluginSettings {
-	mySetting: string;
+export interface CookbookSettings {
+	propsToShow: string[];
 }
 
-export const DEFAULT_SETTINGS: MyPluginSettings = {
-	mySetting: 'default'
-}
+export const DEFAULT_SETTINGS: CookbookSettings = {
+	propsToShow: ["title", "cover"],
+};
 
-export class SampleSettingTab extends PluginSettingTab {
-	plugin: MyPlugin;
+export class CookbookSettingTab extends PluginSettingTab {
+	plugin: CookbookPlugin;
 
-	constructor(app: App, plugin: MyPlugin) {
+	constructor(app: App, plugin: CookbookPlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}
 
 	display(): void {
-		const {containerEl} = this;
+		const { containerEl } = this;
 
 		containerEl.empty();
 
 		new Setting(containerEl)
-			.setName('Settings #1')
-			.setDesc('It\'s a secret')
-			.addText(text => text
-				.setPlaceholder('Enter your secret')
-				.setValue(this.plugin.settings.mySetting)
-				.onChange(async (value) => {
-					this.plugin.settings.mySetting = value;
-					await this.plugin.saveSettings();
-				}));
+			.setName("Properties to Display")
+			.setDesc(
+				"List of all properties you wish to display in the cookbook recipe grid. As comma seperated list."
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("title, cook-time, cover")
+					.setValue(this.plugin.settings.propsToShow.join(", "))
+					.onChange(async (value) => {
+						this.plugin.settings.propsToShow = value
+							.split(",")
+							.map((s) => s.trim())
+							.filter((s) => s.length > 0);
+						await this.plugin.saveSettings();
+					})
+			);
 	}
 }
