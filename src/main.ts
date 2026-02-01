@@ -8,7 +8,7 @@ import { getRecipes } from "utils/getRecipes";
 
 export default class CookbookPlugin extends Plugin {
 	settings: CookbookSettings;
-
+	// test change from nat
 	async onload() {
 		await this.loadSettings();
 
