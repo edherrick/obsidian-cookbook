@@ -26,3 +26,18 @@
     gap: 0.7rem;
     margin-bottom: auto;
 }
+
+.modal {
+	width: 70vw !important;           /* let it grow */
+	max-width: 80vw !important;       /* cap at 90% of viewport */
+}
+
+.modal-content {
+	width: 100%;                       /* fill the modal container */
+	height: auto;
+	max-height: 80vh;
+	overflow-y: auto;
+	overflow-x: hidden;
+	padding: 1rem;
+	box-sizing: border-box;
+}

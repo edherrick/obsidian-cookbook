@@ -20,6 +20,7 @@ export default class CookbookPlugin extends Plugin {
 			console.log("Props to show:", propsToShow);
 			const openRecipeModal = () => {
 				new SvelteModalWrapper(this.app, RecipesModal, {
+					app: this.app,
 					recipes,
 					propsToShow: propsToShow,
 				}).open();
