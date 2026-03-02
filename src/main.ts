@@ -4,7 +4,7 @@ import type { CookbookSettings } from "./settings";
 import { SvelteModalWrapper } from "./utils/SvelteModalWrapper";
 import CookbookRibbonModal from "./ui/modals/CookbookRibbonModal.svelte";
 import RecipesModal from "./ui/modals/RecipesModal.svelte";
-import { getRecipes } from "utils/getRecipes";
+import { getRecipes } from "utils/recipeUtils";
 
 export default class CookbookPlugin extends Plugin {
 	settings: CookbookSettings;
@@ -28,6 +28,7 @@ export default class CookbookPlugin extends Plugin {
 
 			new SvelteModalWrapper(this.app, CookbookRibbonModal, {
 				openRecipeModal,
+				recipes,
 			}).open();
 		});
 
@@ -84,7 +85,7 @@ export default class CookbookPlugin extends Plugin {
 
 		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
 		this.registerInterval(
-			window.setInterval(() => console.log("setInterval"), 5 * 60 * 1000)
+			window.setInterval(() => console.log("setInterval"), 5 * 60 * 1000),
 		);
 	}
 
@@ -94,7 +95,7 @@ export default class CookbookPlugin extends Plugin {
 		this.settings = Object.assign(
 			{},
 			DEFAULT_SETTINGS,
-			(await this.loadData()) as Partial<CookbookSettings>
+			(await this.loadData()) as Partial<CookbookSettings>,
 		);
 	}
 

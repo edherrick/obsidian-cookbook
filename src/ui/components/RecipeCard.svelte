@@ -8,28 +8,22 @@
 		recipe = {},
 		propsToShow = [] as string[],
 		coverField = "cover",
+		cookToggle = "cook-soon",
 	} = $props<{
 		app: App;
 		recipe: Record<string, any>;
 		propsToShow?: string[];
 		coverField?: string;
+		cookToggle?: string;
 	}>();
 
-	const visibleProps = $derived(
-		propsToShow.filter(
-			(key) => key in recipe && key !== "title" && key !== coverField,
-		),
-	) as string[];
+	// Only show keys that exist on recipe, ignoring title & cover
+	const visibleProps = propsToShow.filter(
+		(key) => key in recipe && key !== "title" && key !== coverField,
+	);
 
 	function openRecipe() {
-		if (!recipe.path) return; // ensure path exists
-		// Close all modal leaves globally
-		if (modal && typeof modal.close === "function") {
-			modal.close();
-		}
-
 		app.workspace.openLinkText(recipe.path, "", false);
-		// arguments: linkText, sourcePath, newLeaf
 	}
 </script>
 
@@ -56,10 +50,16 @@
 
 	<div class="recipe-body">
 		{#each visibleProps as key (key)}
-			{#if key in recipe && key !== coverField}
+			{#if key !== cookToggle}
 				<span class="field-key">{key}</span>
 				<span class="field-colon">:</span>
 				<span class="field-value">{recipe[key]}</span>
+			{:else}
+				<span class="field-key">{key}</span>
+				<span class="field-colon">:</span>
+				<span class="field-value">
+					<input type="checkbox" bind:checked={recipe[cookToggle]} />
+				</span>
 			{/if}
 		{/each}
 	</div>
@@ -120,8 +120,8 @@
 		background: none;
 		border: none;
 		padding: 0;
-		font: inherit; /* inherit font size, weight, etc. */
-		color: var(--text-accent); /* optional: match link color */
+		font: inherit;
+		color: var(--text-accent);
 		cursor: pointer;
 		text-align: left;
 	}
