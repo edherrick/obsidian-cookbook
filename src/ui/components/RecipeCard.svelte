@@ -1,6 +1,7 @@
 <script lang="ts">
-	import { getContext } from "svelte";
+	import { getContext, onMount } from "svelte";
 	import type { App } from "obsidian";
+	import { obsidianIcon } from "../../utils/obsidianIcon";
 
 	const app = getContext<App>("app"); // get app from context
 
@@ -8,19 +9,16 @@
 		recipe = {},
 		propsToShow = [] as string[],
 		coverField = "cover",
-		cookToggle = "cook-soon",
+		cookProp = "cook-soon",
+		onToggleCookSoon,
 	} = $props<{
 		app: App;
 		recipe: Record<string, any>;
 		propsToShow?: string[];
 		coverField?: string;
-		cookToggle?: string;
+		cookProp?: string;
+		onToggleCookSoon?: (path: string) => void;
 	}>();
-
-	// Only show keys that exist on recipe, ignoring title & cover
-	const visibleProps = propsToShow.filter(
-		(key) => key in recipe && key !== "title" && key !== coverField,
-	);
 
 	function openRecipe() {
 		app.workspace.openLinkText(recipe.path, "", false);
@@ -39,18 +37,22 @@
 	{#if recipe.title}
 		<h1 class="recipe-title">
 			<button
-				class="open-recipe-btn"
+				class="recipe-link"
 				onclick={openRecipe}
 				title="Open recipe"
 			>
-				{recipe.title}
+				<span class="title-text">{recipe.title}</span>
+				<span
+					use:obsidianIcon={"square-arrow-out-up-right"}
+					class="recipe-icon"
+				></span>
 			</button>
 		</h1>
 	{/if}
 
 	<div class="recipe-body">
-		{#each visibleProps as key (key)}
-			{#if key !== cookToggle}
+		{#each propsToShow.filter((key: string) => key in recipe && key !== "title" && key !== coverField) as key (key)}
+			{#if key !== cookProp}
 				<span class="field-key">{key}</span>
 				<span class="field-colon">:</span>
 				<span class="field-value">{recipe[key]}</span>
@@ -58,7 +60,12 @@
 				<span class="field-key">{key}</span>
 				<span class="field-colon">:</span>
 				<span class="field-value">
-					<input type="checkbox" bind:checked={recipe[cookToggle]} />
+					<input
+						type="checkbox"
+						checked={recipe[cookProp]}
+						onchange={() =>
+							onToggleCookSoon && onToggleCookSoon(recipe.path)}
+					/>
 				</span>
 			{/if}
 		{/each}
@@ -86,9 +93,44 @@
 	.recipe-title {
 		font-size: 1.2rem;
 		font-weight: bold;
-		margin: 0.5rem;
+		margin: 0;
+		padding: 0.5rem;
+		/* header area, link inside handles layout */
 		text-align: center;
 	}
+
+	.recipe-link {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 100%;
+		background: none;
+		border: none;
+		padding: 0;
+		color: inherit;
+		cursor: pointer;
+		text-align: center;
+		border-radius: var(--radius-s);
+	}
+
+	.recipe-link:hover,
+	.recipe-link:focus {
+		background: var(--background-modifier-hover);
+	}
+
+	.title-text {
+		flex: 1 1 0;
+		min-width: 0;
+		overflow-wrap: break-word;
+		white-space: normal;
+		text-align: center;
+	}
+
+	.recipe-icon {
+		margin-left: 0.25rem;
+	}
+
+	/* remove previous duplicate button rules */
 
 	.recipe-body {
 		padding: 0.5rem;
@@ -114,15 +156,5 @@
 	.field-value {
 		text-align: left;
 		overflow-wrap: anywhere;
-	}
-
-	.open-recipe-btn {
-		background: none;
-		border: none;
-		padding: 0;
-		font: inherit;
-		color: var(--text-accent);
-		cursor: pointer;
-		text-align: left;
 	}
 </style>

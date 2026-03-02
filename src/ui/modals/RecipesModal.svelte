@@ -1,37 +1,75 @@
 <script lang="ts">
-	import { setContext, onDestroy } from "svelte";
+	import { setContext } from "svelte";
 	import RecipeCard from "../components/RecipeCard.svelte";
 	import type { App } from "obsidian";
-	import { flushCookSoon } from "../../utils/recipeUtils";
-
-	// Props from parent
-	const { recipes, propsToShow, app } = $props<{
-		recipes?: Record<string, any>[];
+	import type { Recipe } from "../../utils/recipeUtils";
+	import type { Readable } from "svelte/store";
+	const { stores, propsToShow, app } = $props<{
+		stores: import("../../utils/recipeStores").RecipeStores;
 		propsToShow?: string[];
 		app: App;
 	}>();
 
-	// Local state: directly editable recipes
-	let localRecipes = $state(recipes ?? []);
+	// recipes store reference; assign immediately so `$recipes` is
+	// defined during the first render. `stores` is stable so it's safe
+	// despite the state_referenced_locally warning.
+	// svelte-ignore state_referenced_locally - `stores` never changes after mount
+	let recipes: Readable<Recipe[]> = stores.recipes;
 
-	// Derived: recipes marked cook-soon
-	const selectedRecipes = $derived(
-		localRecipes.filter((r) => r["cook-soon"]),
-	);
-
-	// Provide app context for child RecipeCard
+	// Provide app context for child RecipeCard IMMEDIATELY (before render)
 	setContext("app", app);
 
-	// Flush cook-soon changes for all recipes on destroy
-	onDestroy(async () => {
-		await Promise.all(localRecipes.map((r) => flushCookSoon(r, app)));
+	// debug: watch mutation of the recipes store
+	$effect(() => {
+		console.log(
+			"RecipesModal $recipes changed",
+			$recipes.map((r) => ({ path: r.path, cook_soon: r.cook_soon })),
+		);
 	});
+
+	// helper to toggle cook-soon flag and update store
+	function toggleCookSoon(path: string) {
+		console.log("toggleCookSoon called", path);
+		stores.recipes.update((list: Recipe[]) =>
+			list.map((r: Recipe) =>
+				r.path === path
+					? {
+							...r,
+							cook_soon: !r.cook_soon,
+							"cook-soon": !r["cook-soon"], // keep the hyphen property in sync if present
+						}
+					: r,
+			),
+		);
+		// log after update (subscribe flush will also log)
+		console.log(
+			"store after toggle",
+			$recipes.map((r) => ({ path: r.path, cook_soon: r.cook_soon })),
+		);
+	}
+
+	// the store subscription in recipeStores.ts already flushes cook-soon
+	// changes immediately, so no need for onDestroy handling here.
 </script>
 
 <div class="recipe-grid">
-	{#each localRecipes as recipe (recipe.path)}
-		<RecipeCard {recipe} {propsToShow} />
-	{/each}
+	{#if $recipes}
+		{#if $recipes.length === 0}
+			<p>No recipes in store (length 0)</p>
+		{:else}
+			{#each $recipes as recipe (recipe.path)}
+				<RecipeCard
+					{recipe}
+					{propsToShow}
+					{app}
+					onToggleCookSoon={() =>
+						toggleCookSoon((recipe as Recipe).path)}
+				/>
+			{/each}
+		{/if}
+	{:else}
+		<p>Loading recipes…</p>
+	{/if}
 </div>
 
 <style>

@@ -1,10 +1,16 @@
 import { App, Editor, MarkdownView, Modal, Notice, Plugin } from "obsidian";
+import { get } from "svelte/store";
 import { DEFAULT_SETTINGS, CookbookSettingTab } from "./settings";
 import type { CookbookSettings } from "./settings";
 import { SvelteModalWrapper } from "./utils/SvelteModalWrapper";
 import CookbookRibbonModal from "./ui/modals/CookbookRibbonModal.svelte";
+// @ts-ignore - Svelte component default export
 import RecipesModal from "./ui/modals/RecipesModal.svelte";
-import { getRecipes } from "utils/recipeUtils";
+import {
+	getRecipes,
+	generateShoppingList as generateShoppingListUtil,
+} from "utils/recipeUtils";
+import { createRecipeStores } from "./utils/recipeStores";
 
 export default class CookbookPlugin extends Plugin {
 	settings: CookbookSettings;
@@ -18,17 +24,42 @@ export default class CookbookPlugin extends Plugin {
 			console.log("Recipes:", recipes);
 			const propsToShow = this.settings.propsToShow;
 			console.log("Props to show:", propsToShow);
+
+			// create shared stores and populate
+			const stores = createRecipeStores(this.app);
+			stores.recipes.set(recipes);
+
+			// helper to pretty-print map to a string
+			function formatShoppingList(map: Map<string, number>) {
+				return Array.from(map.entries())
+					.map(([item, qty]) => `${qty} ${item}`)
+					.join("\n");
+			}
+
 			const openRecipeModal = () => {
+				console.log(
+					"openRecipeModal stores.recipes:",
+					get(stores.recipes),
+				);
 				new SvelteModalWrapper(this.app, RecipesModal, {
 					app: this.app,
-					recipes,
-					propsToShow: propsToShow,
+					stores,
+					propsToShow,
 				}).open();
+			};
+
+			const generateShoppingList = async () => {
+				const all = get(stores.recipes);
+				const list = await generateShoppingListUtil(this.app, all);
+				console.log("shopping list", list);
+				new Notice("Shopping list:\n" + formatShoppingList(list));
 			};
 
 			new SvelteModalWrapper(this.app, CookbookRibbonModal, {
 				openRecipeModal,
-				recipes,
+				generateShoppingList,
+				stores,
+				app: this.app,
 			}).open();
 		});
 

@@ -76,3 +76,51 @@ export async function flushCookSoon(recipe: Recipe, app: App) {
 export function toggleCookSoon(recipe: Recipe) {
 	recipe.cook_soon = !recipe.cook_soon;
 }
+
+/**
+ * Build a consolidated shopping list from the given recipes.
+ *
+ * The implementation looks for markdown checkbox lines in each recipe file
+ * (`- [ ] …` or `- [x] …`).  It attempts to parse a leading numeric quantity
+ * and aggregates amounts for identical items (case‑insensitive).  When no
+ * quantity is present the item is counted once per occurrence.
+ *
+ * @param app     Obsidian app (used to read files)
+ * @param recipes array of Recipe objects (usually from the store)
+ * @returns a map from item description to total quantity or count
+ */
+export async function generateShoppingList(app: App, recipes: Recipe[]) {
+	const list = new Map<string, number>();
+
+	// regex to capture lines that look like markdown checkboxes
+	const checkboxRe = /^[-*]\s*\[[ xX]?\]\s*(.+)$/gm;
+	for (const recipe of recipes) {
+		if (!recipe.cook_soon) continue;
+		const file = app.vault.getAbstractFileByPath(recipe.path);
+		if (!file || (file instanceof Object && (file as any).children))
+			continue; // skip folders
+		try {
+			const text = await app.vault.read(file as import("obsidian").TFile);
+			let m: RegExpExecArray | null;
+			while ((m = checkboxRe.exec(text))) {
+				let item = m[1].trim();
+				// normalize by lowercasing; keep original for display if desired
+				const lower = item.toLowerCase();
+				// attempt to parse a leading quantity
+				const qtyMatch = /^([0-9]+(?:\.[0-9]+)?)(?:\s+)(.+)$/.exec(
+					item,
+				);
+				if (qtyMatch) {
+					const qty = parseFloat(qtyMatch[1]);
+					const key = qtyMatch[2].toLowerCase();
+					list.set(key, (list.get(key) ?? 0) + qty);
+				} else {
+					list.set(lower, (list.get(lower) ?? 0) + 1);
+				}
+			}
+		} catch (e) {
+			console.error("Failed reading recipe file", recipe.path, e);
+		}
+	}
+	return list;
+}
