@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, Setting } from "obsidian";
+import { App, PluginSettingTab, Setting, setIcon } from "obsidian";
 import CookbookPlugin from "./main";
 import { FolderSuggest } from "./utils/suggesters/FolderSuggester";
 import type { ShoppingCategory } from "./types";
@@ -121,79 +121,141 @@ export class CookbookSettingTab extends PluginSettingTab {
 			cls: "setting-item-description",
 		});
 
+		// Inject scoped styles for the category rows once
+		if (!containerEl.doc.getElementById("cookbook-cat-styles")) {
+			const style = containerEl.doc.createElement("style");
+			style.id = "cookbook-cat-styles";
+			style.textContent = `
+				.cookbook-cat-row {
+					display: grid;
+					grid-template-columns: 1fr auto;
+					gap: 4px;
+					padding: 6px 0;
+					border-bottom: 1px solid var(--background-modifier-border);
+				}
+				.cookbook-cat-fields {
+					display: flex;
+					gap: 6px;
+					flex-wrap: wrap;
+					align-items: center;
+				}
+				.cookbook-cat-name {
+					width: 130px;
+					flex-shrink: 0;
+				}
+				.cookbook-cat-keywords {
+					flex: 1;
+					min-width: 160px;
+				}
+				.cookbook-cat-actions {
+					display: flex;
+					gap: 2px;
+					align-items: center;
+					flex-shrink: 0;
+				}
+				.cookbook-cat-actions button {
+					padding: 2px 5px;
+					cursor: pointer;
+					background: none;
+					border: 1px solid transparent;
+					border-radius: 3px;
+					color: var(--text-muted);
+				}
+				.cookbook-cat-actions button:hover {
+					border-color: var(--background-modifier-border);
+					color: var(--text-normal);
+				}
+				.cookbook-cat-actions .is-danger:hover {
+					color: var(--text-error);
+					border-color: var(--text-error);
+				}
+			`;
+			containerEl.doc.head.appendChild(style);
+		}
+
 		const categoriesContainer = containerEl.createDiv();
 
 		const renderCategories = () => {
 			categoriesContainer.empty();
 
-			this.plugin.settings.shoppingCategories.forEach((cat, idx) => {
-				const setting = new Setting(categoriesContainer)
-					.setName(`Category ${idx + 1}`)
-					.addText((t) =>
-						t
-							.setPlaceholder("Name (e.g. Produce)")
-							.setValue(cat.name)
-							.onChange(async (v) => {
-								this.plugin.settings.shoppingCategories[idx]!.name = v;
-								await this.plugin.saveSettings();
-							}),
-					)
-					.addText((t) => {
-						t.inputEl.style.width = "220px";
-						return t
-							.setPlaceholder("Keywords, comma-separated")
-							.setValue(cat.keywords.join(", "))
-							.onChange(async (v) => {
-								this.plugin.settings.shoppingCategories[idx]!.keywords = v
-									.split(",")
-									.map((s) => s.trim())
-									.filter((s) => s.length > 0);
-								await this.plugin.saveSettings();
-							});
-					})
-					.addButton((b) =>
-						b
-							.setIcon("trash")
-							.setTooltip("Remove")
-							.onClick(async () => {
-								this.plugin.settings.shoppingCategories.splice(idx, 1);
-								await this.plugin.saveSettings();
-								renderCategories();
-							}),
-					);
+			const cats = this.plugin.settings.shoppingCategories;
+
+			cats.forEach((cat, idx) => {
+				const row = categoriesContainer.createDiv({ cls: "cookbook-cat-row" });
+
+				// ── Fields (name + keywords) ──────────────────────────────
+				const fields = row.createDiv({ cls: "cookbook-cat-fields" });
+
+				const nameInput = fields.createEl("input", { type: "text" });
+				nameInput.className = "cookbook-cat-name";
+				nameInput.placeholder = "Name (e.g. Produce)";
+				nameInput.value = cat.name;
+				nameInput.addEventListener("input", async () => {
+					this.plugin.settings.shoppingCategories[idx]!.name =
+						nameInput.value;
+					await this.plugin.saveSettings();
+				});
+
+				const kwInput = fields.createEl("input", { type: "text" });
+				kwInput.className = "cookbook-cat-keywords";
+				kwInput.placeholder = "Keywords, comma-separated";
+				kwInput.value = cat.keywords.join(", ");
+				kwInput.addEventListener("input", async () => {
+					this.plugin.settings.shoppingCategories[idx]!.keywords =
+						kwInput.value
+							.split(",")
+							.map((s) => s.trim())
+							.filter((s) => s.length > 0);
+					await this.plugin.saveSettings();
+				});
+
+				// ── Action buttons ────────────────────────────────────────
+				const actions = row.createDiv({ cls: "cookbook-cat-actions" });
+
+				const mkBtn = (icon: string, tooltip: string, danger = false) => {
+					const btn = actions.createEl("button");
+					btn.title = tooltip;
+					if (danger) btn.addClass("is-danger");
+					setIcon(btn, icon);
+					return btn;
+				};
 
 				if (idx > 0) {
-					setting.addButton((b) =>
-						b
-							.setIcon("arrow-up")
-							.setTooltip("Move up")
-							.onClick(async () => {
-								const cats = this.plugin.settings.shoppingCategories;
-								const a = cats[idx - 1]!;
-								const b = cats[idx]!;
-								cats[idx - 1] = b;
-								cats[idx] = a;
-								await this.plugin.saveSettings();
-								renderCategories();
-							}),
+					mkBtn("arrow-up", "Move up").addEventListener(
+						"click",
+						async () => {
+							const a = cats[idx - 1]!;
+							const b = cats[idx]!;
+							cats[idx - 1] = b;
+							cats[idx] = a;
+							await this.plugin.saveSettings();
+							renderCategories();
+						},
 					);
 				}
-				if (idx < this.plugin.settings.shoppingCategories.length - 1) {
-					setting.addButton((b) =>
-						b
-							.setIcon("arrow-down")
-							.setTooltip("Move down")
-							.onClick(async () => {
-								const cats = this.plugin.settings.shoppingCategories;
-								const a = cats[idx]!;
-								const b = cats[idx + 1]!;
-								cats[idx] = b;
-								cats[idx + 1] = a;
-								await this.plugin.saveSettings();
-								renderCategories();
-							}),
+
+				if (idx < cats.length - 1) {
+					mkBtn("arrow-down", "Move down").addEventListener(
+						"click",
+						async () => {
+							const a = cats[idx]!;
+							const b = cats[idx + 1]!;
+							cats[idx] = b;
+							cats[idx + 1] = a;
+							await this.plugin.saveSettings();
+							renderCategories();
+						},
 					);
 				}
+
+				mkBtn("trash", "Remove", true).addEventListener(
+					"click",
+					async () => {
+						this.plugin.settings.shoppingCategories.splice(idx, 1);
+						await this.plugin.saveSettings();
+						renderCategories();
+					},
+				);
 			});
 
 			new Setting(categoriesContainer).addButton((b) =>

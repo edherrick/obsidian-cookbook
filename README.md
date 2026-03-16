@@ -1,90 +1,120 @@
-# Obsidian Sample Plugin
+# Cookbook
 
-This is a sample plugin for Obsidian (https://obsidian.md).
+An [Obsidian](https://obsidian.md) plugin to browse your recipe notes, filter them by frontmatter properties, and generate categorised shopping lists.
 
-This project uses TypeScript to provide type checking and documentation.
-The repo depends on the latest plugin API (obsidian.d.ts) in TypeScript Definition format, which contains TSDoc comments describing what it does.
+## Features
 
-This sample plugin demonstrates some of the basic functionality the plugin API can do.
-- Adds a ribbon icon, which shows a Notice when clicked.
-- Adds a command "Open modal (simple)" which opens a Modal.
-- Adds a plugin setting tab to the settings page.
-- Registers a global click event and output 'click' to the console.
-- Registers a global interval which logs 'setInterval' to the console.
+- **Recipe grid** — view all your recipe notes in a card layout with cover images and frontmatter fields
+- **Filters** — filter recipes by any frontmatter property; supports string matching and numeric comparisons (`<`, `=`, `>`)
+- **Cook soon** — flag recipes you plan to make this week
+- **Shopping list** — generate a categorised, grouped shopping list from your cook-soon recipes
+- **Custom items** — add one-off items to the shopping list manually
+- **Drag to reorder** — rearrange shopping list categories by dragging
+- **Recipe detail** — click any recipe card to read the full note rendered inside Obsidian
 
-## First time developing plugins?
+## How It Works
 
-Quick starting guide for new plugin devs:
+Cookbook reads notes in your vault and treats any note tagged `#recipe` (configurable) as a recipe. Frontmatter properties are used for display and filtering.
 
-- Check if [someone already developed a plugin for what you want](https://obsidian.md/plugins)! There might be an existing plugin similar enough that you can partner up with.
-- Make a copy of this repo as a template with the "Use this template" button (login to GitHub if you don't see it).
-- Clone your repo to a local development folder. For convenience, you can place this folder in your `.obsidian/plugins/your-plugin-name` folder.
-- Install NodeJS, then run `npm i` in the command line under your repo folder.
-- Run `npm run dev` to compile your plugin from `main.ts` to `main.js`.
-- Make changes to `main.ts` (or create new `.ts` files). Those changes should be automatically compiled into `main.js`.
-- Reload Obsidian to load the new version of your plugin.
-- Enable plugin in settings window.
-- For updates to the Obsidian API run `npm update` in the command line under your repo folder.
+### Example recipe note
 
-## Releasing new releases
+Ingredients are read from **checkboxes** (`- [ ]`) anywhere in the note body. Each checkbox line becomes one shopping list item.
 
-- Update your `manifest.json` with your new version number, such as `1.0.1`, and the minimum Obsidian version required for your latest release.
-- Update your `versions.json` file with `"new-plugin-version": "minimum-obsidian-version"` so older versions of Obsidian can download an older version of your plugin that's compatible.
-- Create new GitHub release using your new version number as the "Tag version". Use the exact version number, don't include a prefix `v`. See here for an example: https://github.com/obsidianmd/obsidian-sample-plugin/releases
-- Upload the files `manifest.json`, `main.js`, `styles.css` as binary attachments. Note: The manifest.json file must be in two places, first the root path of your repository and also in the release.
-- Publish the release.
+```markdown
+---
+tags: [recipe]
+title: Spaghetti Bolognese
+cook-time: 45
+servings: 4
+cover: https://example.com/bolognese.jpg
+---
 
-> You can simplify the version bump process by running `npm version patch`, `npm version minor` or `npm version major` after updating `minAppVersion` manually in `manifest.json`.
-> The command will bump version in `manifest.json` and `package.json`, and add the entry for the new version to `versions.json`
+## Ingredients
 
-## Adding your plugin to the community plugin list
+- [ ] 2 cloves garlic
+- [ ] 500g beef mince
+- [ ] 1 tin chopped tomatoes
+- [ ] 200g spaghetti
+- [ ] olive oil
 
-- Check the [plugin guidelines](https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines).
-- Publish an initial version.
-- Make sure you have a `README.md` file in the root of your repo.
-- Make a pull request at https://github.com/obsidianmd/obsidian-releases to add your plugin.
+## Method
 
-## How to use
-
-- Clone this repo.
-- Make sure your NodeJS is at least v16 (`node --version`).
-- `npm i` or `yarn` to install dependencies.
-- `npm run dev` to start compilation in watch mode.
-
-## Manually installing the plugin
-
-- Copy over `main.js`, `styles.css`, `manifest.json` to your vault `VaultFolder/.obsidian/plugins/your-plugin-id/`.
-
-## Improve code quality with eslint
-- [ESLint](https://eslint.org/) is a tool that analyzes your code to quickly find problems. You can run ESLint against your plugin to find common bugs and ways to improve your code. 
-- This project already has eslint preconfigured, you can invoke a check by running`npm run lint`
-- Together with a custom eslint [plugin](https://github.com/obsidianmd/eslint-plugin) for Obsidan specific code guidelines.
-- A GitHub action is preconfigured to automatically lint every commit on all branches.
-
-## Funding URL
-
-You can include funding URLs where people who use your plugin can financially support it.
-
-The simple way is to set the `fundingUrl` field to your link in your `manifest.json` file:
-
-```json
-{
-    "fundingUrl": "https://buymeacoffee.com"
-}
+Your method here...
 ```
 
-If you have multiple URLs, you can also do:
+Both unchecked `[ ]` and already-checked `[x]` boxes are picked up — the checked state in your note does not affect the shopping list.
 
-```json
-{
-    "fundingUrl": {
-        "Buy Me a Coffee": "https://buymeacoffee.com",
-        "GitHub Sponsor": "https://github.com/sponsors",
-        "Patreon": "https://www.patreon.com/"
-    }
-}
+#### Quantities
+
+If a checkbox line starts with a number, the plugin treats it as a quantity:
+
+```
+- [ ] 500 beef mince      →  quantity: 500,  text: "beef mince"
+- [ ] cloves garlic       →  quantity: null, text: "cloves garlic"
 ```
 
-## API Documentation
+#### Aggregation across recipes
 
-See https://docs.obsidian.md
+When you generate a shopping list from multiple cook-soon recipes, identical ingredients (matched case-insensitively) are **merged into a single line**:
+
+- Quantities are **summed** — `200g pasta` from one recipe and `200g pasta` from another becomes `400 pasta`
+- The source recipe titles are **combined** and shown as a label under the item so you know where it came from
+
+Items that cannot be matched to a category fall into **Uncategorized** at the bottom of the list.
+
+### Using the plugin
+
+1. Click the **utensils icon** in the ribbon to open the quick-access menu
+2. Select **Open Cookbook** to browse and filter your recipes
+3. Mark recipes as **Cook soon** using the checkbox on each card or in the detail view
+4. Back in the ribbon menu, click **Generate Shopping List** to build a shopping list from your cook-soon recipes
+5. The **Shopping List** panel opens in the right sidebar — check off items as you shop
+
+## Commands
+
+| Command | Description |
+| --- | --- |
+| **Open Cookbook** | Opens the recipe browser |
+| **Open Shopping List** | Opens the shopping list sidebar panel |
+
+## Settings
+
+### Properties to Display
+
+A comma-separated list of frontmatter properties to show on each recipe card (e.g. `title, cook-time, servings, cover`).
+
+### Folder for Recipes
+
+Restrict recipe scanning to a specific folder. Defaults to the entire vault.
+
+### Tag for Recipes
+
+The tag that identifies a note as a recipe. Defaults to `#recipe`.
+
+### Shopping List Categories
+
+Define keyword-based categories to group shopping list items. When a shopping list is generated, each ingredient is matched against your category keywords and grouped accordingly. Unmatched items go to **Uncategorized**.
+
+Default categories: Produce, Dairy & Eggs, Meat & Fish, Pantry.
+
+You can add, remove, reorder, and edit categories and their keywords from the settings tab.
+
+## Installation
+
+### Community plugins (recommended)
+
+1. Open Obsidian Settings → Community plugins
+2. Search for **Cookbook**
+3. Click Install, then Enable
+
+### Manual
+
+1. Download `main.js`, `styles.css`, and `manifest.json` from the [latest release](../../releases/latest)
+2. Copy them to `<your vault>/.obsidian/plugins/cookbook/`
+3. Enable the plugin in Obsidian Settings → Community plugins
+
+## Support
+
+If you find this plugin useful, you can support development here:
+
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-support-yellow)](https://buymeacoffee.com/digon)

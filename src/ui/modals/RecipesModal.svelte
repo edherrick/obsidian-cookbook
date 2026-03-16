@@ -64,10 +64,7 @@
 		return result;
 	}
 
-	let filterOptions: Map<string, FilterMeta> = $state(new Map());
-	$effect(() => {
-		filterOptions = buildFilterOptions($recipes);
-	});
+	let filterOptions = $derived(buildFilterOptions($recipes));
 
 	let activeFilters: Map<string, FilterValue> = $state(new Map());
 
@@ -132,17 +129,11 @@
 		return true;
 	}
 
-	let filteredRecipes: Recipe[] = $state([]);
-	$effect(() => {
-		filteredRecipes = $recipes.filter(recipeMatchesFilters);
-	});
+	let filteredRecipes = $derived($recipes.filter(recipeMatchesFilters));
 
-	let availableKeysToAdd: string[] = $state([]);
-	$effect(() => {
-		availableKeysToAdd = [...filterOptions.keys()].filter(
-			(k) => !activeFilters.has(k),
-		);
-	});
+	let availableKeysToAdd = $derived(
+		[...filterOptions.keys()].filter((k) => !activeFilters.has(k)),
+	);
 
 	// ─── Cook-soon toggle ─────────────────────────────────────────────────────
 	function toggleCookSoon(path: string) {

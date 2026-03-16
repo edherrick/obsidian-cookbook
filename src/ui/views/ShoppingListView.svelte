@@ -195,7 +195,7 @@
 		</p>
 	{:else}
 		<!-- Recipe ingredient groups (draggable to reorder) -->
-		{#each groups as group}
+		{#each groups as group (group.category)}
 			<div
 				class="category-group"
 				class:drag-over={dragOver === group.category}
