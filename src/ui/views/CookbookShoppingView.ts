@@ -28,7 +28,7 @@ export class CookbookShoppingView extends ItemView {
 	}
 
 	getDisplayText(): string {
-		return "Shopping List";
+		return "Shopping list";
 	}
 
 	getIcon(): string {
@@ -48,7 +48,7 @@ export class CookbookShoppingView extends ItemView {
 
 	async onClose(): Promise<void> {
 		if (this.component) {
-			unmount(this.component);
+			await unmount(this.component);
 			this.component = null;
 		}
 	}

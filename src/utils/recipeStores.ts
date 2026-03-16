@@ -20,7 +20,7 @@ export function createRecipeStores(app: App): RecipeStores {
 	const shoppingList = writable<PersistedShoppingList | null>(null);
 
 	recipes.subscribe((list) => {
-		void Promise.all(list.map((r) => flushCookSoon(r as Recipe, app)));
+		void Promise.all(list.map((r) => flushCookSoon(r, app)));
 	});
 
 	return { recipes, selectedRecipes, shoppingList };

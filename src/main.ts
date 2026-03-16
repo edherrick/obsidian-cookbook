@@ -51,13 +51,13 @@ export default class CookbookPlugin extends Plugin {
 
 		this.addCommand({
 			id: "open-shopping-view",
-			name: "Open Shopping List",
+			name: "Open shopping list",
 			callback: () => this.openShoppingListView(),
 		});
 
 		this.addCommand({
-			id: "open-cookbook",
-			name: "Open Cookbook",
+			id: "browse",
+			name: "Browse recipes",
 			callback: () => {
 				new SvelteModalWrapper(this.app, RecipesModal, {
 					app: this.app,
@@ -107,13 +107,13 @@ export default class CookbookPlugin extends Plugin {
 		const existing =
 			this.app.workspace.getLeavesOfType(VIEW_TYPE_SHOPPING);
 		if (existing.length > 0) {
-			this.app.workspace.revealLeaf(existing[0]!);
+			await this.app.workspace.revealLeaf(existing[0]!);
 			return;
 		}
 		const leaf = this.app.workspace.getRightLeaf(false);
 		if (!leaf) return;
 		await leaf.setViewState({ type: VIEW_TYPE_SHOPPING, active: true });
-		this.app.workspace.revealLeaf(leaf);
+		await this.app.workspace.revealLeaf(leaf);
 	}
 
 	async loadSettings() {

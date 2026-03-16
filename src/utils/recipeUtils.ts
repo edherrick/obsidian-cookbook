@@ -1,10 +1,12 @@
-import type { App, TFile } from "obsidian";
+import { TFile } from "obsidian";
+import type { App } from "obsidian";
 import type { PersistedShoppingList, ShoppingCategory, ShoppingItem } from "../types";
 
 export interface Recipe {
 	path: string;
 	cook_soon: boolean;
 	title: string;
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	[frontMatterProp: string]: any;
 	__tags: string[];
 }
@@ -38,6 +40,7 @@ export async function getRecipes(app: App): Promise<Recipe[]> {
 			...fm,
 			path: file.path,
 			cook_soon: !!fm["cook-soon"],
+			// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 			title: fm.title ?? file.basename,
 			__tags: normalizedTags,
 		});
@@ -48,9 +51,10 @@ export async function getRecipes(app: App): Promise<Recipe[]> {
 
 export async function flushCookSoon(recipe: Recipe, app: App) {
 	if (!recipe.path) return;
-	const file = app.vault.getAbstractFileByPath(recipe.path) as TFile;
-	if (!file) return;
+	const file = app.vault.getAbstractFileByPath(recipe.path);
+	if (!(file instanceof TFile)) return;
 	await app.fileManager.processFrontMatter(file, (fm) => {
+		// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
 		fm["cook-soon"] = !!recipe.cook_soon;
 	});
 }
@@ -82,8 +86,8 @@ export async function buildShoppingList(
 
 	for (const recipe of recipes) {
 		if (!recipe.cook_soon) continue;
-		const file = app.vault.getAbstractFileByPath(recipe.path) as TFile | null;
-		if (!file || (file as any).children) continue;
+		const file = app.vault.getAbstractFileByPath(recipe.path);
+		if (!(file instanceof TFile)) continue;
 
 		try {
 			const text = await app.vault.read(file);
