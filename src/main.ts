@@ -1,58 +1,93 @@
-import { App, Editor, MarkdownView, Modal, Notice, Plugin } from "obsidian";
+import { Plugin, WorkspaceLeaf } from "obsidian";
 import { get } from "svelte/store";
 import { DEFAULT_SETTINGS, CookbookSettingTab } from "./settings";
 import type { CookbookSettings } from "./settings";
 import { SvelteModalWrapper } from "./utils/SvelteModalWrapper";
 import CookbookRibbonModal from "./ui/modals/CookbookRibbonModal.svelte";
-// @ts-ignore - Svelte component default export
-import RecipesModal from "./ui/modals/RecipesModal.svelte";
 import {
-	getRecipes,
-	generateShoppingList as generateShoppingListUtil,
-} from "utils/recipeUtils";
+	VIEW_TYPE_SHOPPING,
+	CookbookShoppingView,
+} from "./ui/views/CookbookShoppingView";
+import RecipesModal from "./ui/modals/RecipesModal.svelte";
+import { getRecipes, buildShoppingList } from "./utils/recipeUtils";
 import { createRecipeStores } from "./utils/recipeStores";
+import type { RecipeStores } from "./utils/recipeStores";
+import type { PersistedShoppingList, ShoppingCategory } from "./types";
 
 export default class CookbookPlugin extends Plugin {
 	settings: CookbookSettings;
+	recipeStores: RecipeStores;
 
 	async onload() {
 		await this.loadSettings();
 
-		// This creates an icon in the left ribbon.
-		this.addRibbonIcon("utensils", "Cookbook", async (evt: MouseEvent) => {
-			const recipes = await getRecipes(this.app);
-			console.log("Recipes:", recipes);
-			const propsToShow = this.settings.propsToShow;
-			console.log("Props to show:", propsToShow);
+		this.recipeStores = createRecipeStores(this.app);
 
-			// create shared stores and populate
-			const stores = createRecipeStores(this.app);
-			stores.recipes.set(recipes);
+		try {
+			const initial = await getRecipes(this.app);
+			this.recipeStores.recipes.set(initial);
+		} catch (e) {
+			console.warn("Failed to populate recipes on load", e);
+		}
 
-			// helper to pretty-print map to a string
-			function formatShoppingList(map: Map<string, number>) {
-				return Array.from(map.entries())
-					.map(([item, qty]) => `${qty} ${item}`)
-					.join("\n");
+		try {
+			const persisted = await this.loadShoppingList();
+			if (persisted) {
+				this.recipeStores.shoppingList.set(persisted);
 			}
+		} catch (e) {
+			console.warn("Failed to load shopping list on load", e);
+		}
+
+		this.registerView(
+			VIEW_TYPE_SHOPPING,
+			(leaf: WorkspaceLeaf) =>
+				new CookbookShoppingView(
+					leaf,
+					this.recipeStores,
+					(data) => this.saveShoppingList(data),
+				),
+		);
+
+		this.addCommand({
+			id: "open-shopping-view",
+			name: "Open Shopping List",
+			callback: () => this.openShoppingListView(),
+		});
+
+		this.addCommand({
+			id: "open-cookbook",
+			name: "Open Cookbook",
+			callback: () => {
+				new SvelteModalWrapper(this.app, RecipesModal, {
+					app: this.app,
+					stores: this.recipeStores,
+					propsToShow: this.settings.propsToShow,
+				}).open();
+			},
+		});
+
+		this.addRibbonIcon("utensils", "Cookbook", () => {
+			const stores = this.recipeStores;
 
 			const openRecipeModal = () => {
-				console.log(
-					"openRecipeModal stores.recipes:",
-					get(stores.recipes),
-				);
 				new SvelteModalWrapper(this.app, RecipesModal, {
 					app: this.app,
 					stores,
-					propsToShow,
+					propsToShow: this.settings.propsToShow,
 				}).open();
 			};
 
 			const generateShoppingList = async () => {
-				const all = get(stores.recipes);
-				const list = await generateShoppingListUtil(this.app, all);
-				console.log("shopping list", list);
-				new Notice("Shopping list:\n" + formatShoppingList(list));
+				const recipes = get(stores.recipes);
+				const list = await buildShoppingList(
+					this.app,
+					recipes,
+					this.settings.shoppingCategories,
+				);
+				stores.shoppingList.set(list);
+				await this.saveShoppingList(list);
+				await this.openShoppingListView();
 			};
 
 			new SvelteModalWrapper(this.app, CookbookRibbonModal, {
@@ -63,90 +98,60 @@ export default class CookbookPlugin extends Plugin {
 			}).open();
 		});
 
-		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		// const statusBarItemEl = this.addStatusBarItem();
-		// statusBarItemEl.setText("Status bar text");
-
-		// This adds a simple command that can be triggered anywhere
-		this.addCommand({
-			id: "open-modal-simple",
-			name: "Open modal (simple)",
-			callback: () => {
-				new SampleModal(this.app).open();
-			},
-		});
-		// This adds an editor command that can perform some operation on the current editor instance
-		this.addCommand({
-			id: "replace-selected",
-			name: "Replace selected content",
-			editorCallback: (editor: Editor, view: MarkdownView) => {
-				editor.replaceSelection("Sample editor command");
-			},
-		});
-		// This adds a complex command that can check whether the current state of the app allows execution of the command
-		this.addCommand({
-			id: "open-modal-complex",
-			name: "Open modal (complex)",
-			checkCallback: (checking: boolean) => {
-				// Conditions to check
-				const markdownView =
-					this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
-					if (!checking) {
-						new SampleModal(this.app).open();
-					}
-
-					// This command will only show up in Command Palette when the check function returns true
-					return true;
-				}
-				return false;
-			},
-		});
-
-		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new CookbookSettingTab(this.app, this));
-
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-		// this.registerDomEvent(document, "click", (evt: MouseEvent) => {
-		// 	new Notice("Click");
-		// });
-
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(
-			window.setInterval(() => console.log("setInterval"), 5 * 60 * 1000),
-		);
 	}
 
 	onunload() {}
 
+	async openShoppingListView(): Promise<void> {
+		const existing =
+			this.app.workspace.getLeavesOfType(VIEW_TYPE_SHOPPING);
+		if (existing.length > 0) {
+			this.app.workspace.revealLeaf(existing[0]!);
+			return;
+		}
+		const leaf = this.app.workspace.getRightLeaf(false);
+		if (!leaf) return;
+		await leaf.setViewState({ type: VIEW_TYPE_SHOPPING, active: true });
+		this.app.workspace.revealLeaf(leaf);
+	}
+
 	async loadSettings() {
-		this.settings = Object.assign(
-			{},
-			DEFAULT_SETTINGS,
-			(await this.loadData()) as Partial<CookbookSettings>,
-		);
+		const data =
+			((await this.loadData()) ?? {}) as Record<string, unknown>;
+		this.settings = {
+			propsToShow:
+				(data.propsToShow as string[] | undefined) ??
+				DEFAULT_SETTINGS.propsToShow,
+			recipesFolder:
+				(data.recipesFolder as string | undefined) ??
+				DEFAULT_SETTINGS.recipesFolder,
+			recipesTag:
+				(data.recipesTag as string | undefined) ??
+				DEFAULT_SETTINGS.recipesTag,
+			shoppingCategories:
+				(data.shoppingCategories as
+					| ShoppingCategory[]
+					| undefined) ??
+				DEFAULT_SETTINGS.shoppingCategories,
+		};
 	}
 
 	async saveSettings() {
-		await this.saveData(this.settings);
-	}
-}
-
-class SampleModal extends Modal {
-	constructor(app: App) {
-		super(app);
+		const existing =
+			((await this.loadData()) ?? {}) as Record<string, unknown>;
+		await this.saveData({ ...existing, ...this.settings });
 	}
 
-	onOpen() {
-		let { contentEl } = this;
-		contentEl.setText("Woah!");
+	async saveShoppingList(data: PersistedShoppingList): Promise<void> {
+		const existing =
+			((await this.loadData()) ?? {}) as Record<string, unknown>;
+		await this.saveData({ ...existing, shoppingList: data });
 	}
 
-	onClose() {
-		const { contentEl } = this;
-		contentEl.empty();
+	async loadShoppingList(): Promise<PersistedShoppingList | null> {
+		const data =
+			((await this.loadData()) ?? {}) as Record<string, unknown>;
+		return (data.shoppingList as PersistedShoppingList) ?? null;
 	}
 }

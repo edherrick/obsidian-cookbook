@@ -1,9 +1,11 @@
 <script lang="ts">
-	import { getContext, onMount } from "svelte";
+	import { getContext } from "svelte";
 	import type { App } from "obsidian";
 	import { obsidianIcon } from "../../utils/obsidianIcon";
+	import { SvelteModalWrapper } from "../../utils/SvelteModalWrapper";
+	import RecipeDetailModal from "../modals/RecipeDetailModal.svelte";
 
-	const app = getContext<App>("app"); // get app from context
+	const app = getContext<App>("app");
 
 	const {
 		recipe = {},
@@ -20,8 +22,13 @@
 		onToggleCookSoon?: (path: string) => void;
 	}>();
 
-	function openRecipe() {
-		app.workspace.openLinkText(recipe.path, "", false);
+	function openDetail() {
+		new SvelteModalWrapper(app, RecipeDetailModal, {
+			recipe,
+			app,
+			onToggleCookSoon: () =>
+				onToggleCookSoon && onToggleCookSoon(recipe.path),
+		}).open();
 	}
 </script>
 
@@ -38,12 +45,12 @@
 		<h1 class="recipe-title">
 			<button
 				class="recipe-link"
-				onclick={openRecipe}
-				title="Open recipe"
+				onclick={openDetail}
+				title="View recipe"
 			>
 				<span class="title-text">{recipe.title}</span>
 				<span
-					use:obsidianIcon={"square-arrow-out-up-right"}
+					use:obsidianIcon={"eye"}
 					class="recipe-icon"
 				></span>
 			</button>
@@ -95,7 +102,6 @@
 		font-weight: bold;
 		margin: 0;
 		padding: 0.5rem;
-		/* header area, link inside handles layout */
 		text-align: center;
 	}
 
@@ -129,8 +135,6 @@
 	.recipe-icon {
 		margin-left: 0.25rem;
 	}
-
-	/* remove previous duplicate button rules */
 
 	.recipe-body {
 		padding: 0.5rem;

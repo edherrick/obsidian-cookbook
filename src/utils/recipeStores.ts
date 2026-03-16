@@ -2,10 +2,12 @@ import { writable, derived } from "svelte/store";
 import type { Writable, Readable } from "svelte/store";
 import type { App } from "obsidian";
 import { flushCookSoon, type Recipe } from "./recipeUtils";
+import type { PersistedShoppingList } from "../types";
 
 export interface RecipeStores {
 	recipes: Writable<Recipe[]>;
 	selectedRecipes: Readable<Recipe[]>;
+	shoppingList: Writable<PersistedShoppingList | null>;
 }
 
 export function createRecipeStores(app: App): RecipeStores {
@@ -15,11 +17,11 @@ export function createRecipeStores(app: App): RecipeStores {
 		$r.filter((r) => r.cook_soon),
 	);
 
-	// whenever the list changes, persist all cook-soon flags
+	const shoppingList = writable<PersistedShoppingList | null>(null);
+
 	recipes.subscribe((list) => {
-		// fire-and-forget; we don't care about the result here
 		void Promise.all(list.map((r) => flushCookSoon(r as Recipe, app)));
 	});
 
-	return { recipes, selectedRecipes };
+	return { recipes, selectedRecipes, shoppingList };
 }

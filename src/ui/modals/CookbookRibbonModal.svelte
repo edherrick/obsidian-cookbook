@@ -3,36 +3,26 @@
 	import { onMount } from "svelte";
 	import { getRecipes } from "../../utils/recipeUtils";
 	import type { Recipe } from "../../utils/recipeUtils";
-	import type { Readable } from "svelte/store";
 
-	const { openRecipeModal, generateShoppingList, stores, app } = $props<{
-		openRecipeModal: () => void;
-		generateShoppingList: () => void;
-		stores: import("../../utils/recipeStores").RecipeStores;
-		app: import("obsidian").App;
-	}>();
+	const { openRecipeModal, generateShoppingList, stores, app, close } =
+		$props<{
+			openRecipeModal: () => void;
+			generateShoppingList: () => Promise<void>;
+			stores: import("../../utils/recipeStores").RecipeStores;
+			app: import("obsidian").App;
+			close: () => void;
+		}>();
 
-	// expose two individual Svelte stores for direct `$` syntax
-	const { recipes, selectedRecipes } = stores;
+	// svelte-ignore state_referenced_locally — stores is a stable reference
+	const { selectedRecipes } = stores;
 
-	// debug: watch selectedRecipes contents directly from store
-	$effect(() => {
-		console.log(
-			"CookbookRibbonModal selectedRecipes:",
-			$selectedRecipes.map((r) => ({
-				path: r.path,
-				cook_soon: r.cook_soon,
-			})),
-		);
-	});
+	let generating = $state(false);
 
 	onMount(async () => {
-		// refresh recipes in case frontmatter changed while modal was closed
 		const fresh = await getRecipes(app);
 		stores.recipes.set(fresh);
 	});
 
-	// helper to flip cook-soon flag (deselect recipe)
 	function toggleCookSoon(path: string) {
 		stores.recipes.update((list: Recipe[]) =>
 			list.map((r: Recipe) =>
@@ -46,10 +36,19 @@
 			),
 		);
 	}
+
+	async function handleGenerate() {
+		generating = true;
+		try {
+			await generateShoppingList();
+			close();
+		} finally {
+			generating = false;
+		}
+	}
 </script>
 
 <div class="ribbon-modal-content">
-	<!-- Currently selected recipes -->
 	{#if $selectedRecipes && $selectedRecipes.length > 0}
 		<div class="selected-recipes">
 			<h3>Selected Recipes</h3>
@@ -66,18 +65,29 @@
 				{/each}
 			</ul>
 		</div>
+	{:else}
+		<p class="no-selection">
+			No recipes selected. Open the Cookbook and mark recipes as
+			"cook soon".
+		</p>
 	{/if}
 
-	<!-- Buttons -->
 	<div class="btn-row">
 		<button class="btn" onclick={openRecipeModal}>
 			<span use:obsidianIcon={"book-open"} class="btn-icon"></span>
 			<span class="btn-label">Open Cookbook</span>
 		</button>
 
-		<button class="btn" onclick={generateShoppingList}>
-			<span use:obsidianIcon={"shopping-cart"} class="btn-icon"></span>
-			<span class="btn-label">Generate Shopping List</span>
+		<button class="btn" onclick={handleGenerate} disabled={generating}>
+			<span
+				use:obsidianIcon={"shopping-cart"}
+				class="btn-icon"
+			></span>
+			<span class="btn-label"
+				>{generating
+					? "Generating…"
+					: "Generate Shopping List"}</span
+			>
 		</button>
 	</div>
 </div>
@@ -87,23 +97,48 @@
 		display: flex;
 		flex-direction: column;
 		gap: 1rem;
+		min-width: 280px;
 	}
 
 	.selected-recipes h3 {
-		margin: 0;
+		margin: 0 0 0.5rem;
 		font-weight: bold;
 	}
 
 	.selected-recipes ul {
 		margin: 0;
-		padding-left: 1rem;
-		list-style-type: disc;
-		max-height: 150px;
+		padding-left: 0;
+		list-style: none;
+		max-height: 200px;
 		overflow-y: auto;
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+	}
+
+	.selected-recipes li {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		font-size: 0.9em;
+	}
+
+	.no-selection {
+		color: var(--text-muted);
+		font-size: 0.9em;
+		margin: 0;
 	}
 
 	.btn-row {
 		display: flex;
-		gap: 1rem;
+		gap: 0.75rem;
+	}
+
+	.btn {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		flex: 1;
+		justify-content: center;
 	}
 </style>
