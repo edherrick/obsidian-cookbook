@@ -135,7 +135,8 @@ export class CookbookSettingTab extends PluginSettingTab {
 			)
 			.addText((text) =>
 				text
-					.setPlaceholder("title, cook-time, cover")
+					// eslint-disable-next-line obsidianmd/ui/sentence-case
+				.setPlaceholder("title, cook-time, cover")
 					.setValue(this.plugin.settings.propsToShow.join(", "))
 					.onChange((value) => {
 						this.plugin.settings.propsToShow = value
