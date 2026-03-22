@@ -35,6 +35,14 @@
 		if (toggled) void flushCookSoon(toggled, app);
 	}
 
+	function setMultiplier(path: string, multiplier: number) {
+		stores.recipes.update((list: Recipe[]) =>
+			list.map((r: Recipe) =>
+				r.path === path ? { ...r, cook_multiplier: multiplier } : r,
+			),
+		);
+	}
+
 	async function handleGenerate() {
 		generating = true;
 		try {
@@ -58,7 +66,12 @@
 							checked={recipe.cook_soon}
 							onchange={() => toggleCookSoon(recipe.path)}
 						/>
-						{(recipe as Recipe).title ?? (recipe as Recipe).path}
+						<span class="recipe-title">{(recipe as Recipe).title ?? (recipe as Recipe).path}</span>
+						<span class="multiplier">
+							<button class="mult-btn" onclick={() => setMultiplier(recipe.path, Math.max(1, (recipe.cook_multiplier ?? 1) - 1))}>−</button>
+							<span class="mult-label">×{recipe.cook_multiplier ?? 1}</span>
+							<button class="mult-btn" onclick={() => setMultiplier(recipe.path, (recipe.cook_multiplier ?? 1) + 1)}>+</button>
+						</span>
 					</li>
 				{/each}
 			</ul>
@@ -119,6 +132,41 @@
 		align-items: center;
 		gap: 6px;
 		font-size: 0.9em;
+	}
+
+	.recipe-title {
+		flex: 1;
+	}
+
+	.multiplier {
+		display: flex;
+		align-items: center;
+		gap: 2px;
+		margin-left: auto;
+	}
+
+	.mult-btn {
+		background: none;
+		border: 1px solid var(--background-modifier-border);
+		border-radius: 3px;
+		cursor: pointer;
+		color: var(--text-muted);
+		font-size: 0.8em;
+		padding: 0 4px;
+		line-height: 1.4;
+	}
+
+	.mult-btn:hover {
+		color: var(--text-normal);
+		border-color: var(--text-accent);
+	}
+
+	.mult-label {
+		font-size: 0.82em;
+		color: var(--text-accent);
+		font-weight: 600;
+		min-width: 1.8em;
+		text-align: center;
 	}
 
 	.no-selection {

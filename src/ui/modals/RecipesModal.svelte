@@ -148,6 +148,14 @@
 		);
 		if (toggled) void flushCookSoon(toggled, app);
 	}
+
+	function setMultiplier(path: string, multiplier: number) {
+		stores.recipes.update((list: Recipe[]) =>
+			list.map((r: Recipe) =>
+				r.path === path ? { ...r, cook_multiplier: multiplier } : r,
+			),
+		);
+	}
 </script>
 
 <div class="recipes-modal">
@@ -257,8 +265,8 @@
 					{recipe}
 					{propsToShow}
 					{app}
-					onToggleCookSoon={() =>
-						toggleCookSoon((recipe as Recipe).path)}
+					onToggleCookSoon={() => toggleCookSoon((recipe as Recipe).path)}
+					onSetMultiplier={(path, m) => setMultiplier(path, m)}
 				/>
 			{/each}
 		{/if}

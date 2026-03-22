@@ -13,6 +13,7 @@
 		coverField = "cover",
 		cookProp = "cook-soon",
 		onToggleCookSoon,
+		onSetMultiplier,
 	} = $props<{
 		app: App;
 		recipe: Record<string, any>;
@@ -20,6 +21,7 @@
 		coverField?: string;
 		cookProp?: string;
 		onToggleCookSoon?: (path: string) => void;
+		onSetMultiplier?: (path: string, multiplier: number) => void;
 	}>();
 
 	function openDetail() {
@@ -28,6 +30,8 @@
 			app,
 			onToggleCookSoon: () =>
 				onToggleCookSoon && onToggleCookSoon(recipe.path),
+			onSetMultiplier: (m: number) =>
+				onSetMultiplier && onSetMultiplier(recipe.path, m),
 		}).open();
 	}
 </script>
@@ -66,13 +70,20 @@
 			{:else}
 				<span class="field-key">{key}</span>
 				<span class="field-colon">:</span>
-				<span class="field-value">
+				<span class="field-value cook-soon-row">
 					<input
 						type="checkbox"
 						checked={recipe[cookProp]}
 						onchange={() =>
 							onToggleCookSoon && onToggleCookSoon(recipe.path)}
 					/>
+					{#if recipe[cookProp]}
+						<span class="multiplier">
+							<button class="mult-btn" onclick={() => onSetMultiplier && onSetMultiplier(recipe.path, Math.max(1, (recipe.cook_multiplier ?? 1) - 1))}>−</button>
+							<span class="mult-label">×{recipe.cook_multiplier ?? 1}</span>
+							<button class="mult-btn" onclick={() => onSetMultiplier && onSetMultiplier(recipe.path, (recipe.cook_multiplier ?? 1) + 1)}>+</button>
+						</span>
+					{/if}
 				</span>
 			{/if}
 		{/each}
@@ -160,5 +171,41 @@
 	.field-value {
 		text-align: left;
 		overflow-wrap: anywhere;
+	}
+
+	.cook-soon-row {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+	}
+
+	.multiplier {
+		display: flex;
+		align-items: center;
+		gap: 2px;
+	}
+
+	.mult-btn {
+		background: none;
+		border: 1px solid var(--background-modifier-border);
+		border-radius: 3px;
+		cursor: pointer;
+		color: var(--text-muted);
+		font-size: 0.8em;
+		padding: 0 4px;
+		line-height: 1.4;
+	}
+
+	.mult-btn:hover {
+		color: var(--text-normal);
+		border-color: var(--text-accent);
+	}
+
+	.mult-label {
+		font-size: 0.82em;
+		color: var(--text-accent);
+		font-weight: 600;
+		min-width: 1.8em;
+		text-align: center;
 	}
 </style>

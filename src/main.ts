@@ -46,6 +46,7 @@ export default class CookbookPlugin extends Plugin {
 					leaf,
 					this.recipeStores,
 					(data) => this.saveShoppingList(data),
+					() => this.settings.shoppingCategories,
 				),
 		);
 

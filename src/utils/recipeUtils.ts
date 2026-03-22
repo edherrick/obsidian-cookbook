@@ -5,6 +5,7 @@ import type { PersistedShoppingList, ShoppingCategory, ShoppingItem } from "../t
 export interface Recipe {
 	path: string;
 	cook_soon: boolean;
+	cook_multiplier: number;
 	title: string;
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	[frontMatterProp: string]: any;
@@ -40,6 +41,7 @@ export async function getRecipes(app: App): Promise<Recipe[]> {
 			...fm,
 			path: file.path,
 			cook_soon: !!fm["cook-soon"],
+			cook_multiplier: 1,
 			// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 			title: fm.title ?? file.basename,
 			__tags: normalizedTags,
@@ -63,7 +65,7 @@ export function toggleCookSoon(recipe: Recipe) {
 	recipe.cook_soon = !recipe.cook_soon;
 }
 
-function assignCategory(text: string, categories: ShoppingCategory[]): string {
+export function assignCategory(text: string, categories: ShoppingCategory[]): string {
 	const lower = text.toLowerCase();
 	for (const cat of categories) {
 		for (const kw of cat.keywords) {
@@ -96,7 +98,7 @@ export async function buildShoppingList(
 			while ((m = checkboxRe.exec(text)) !== null) {
 				const raw = m[1]!.trim();
 				const qtyMatch = /^([0-9]+(?:\.[0-9]+)?)\s+(.+)$/.exec(raw);
-				const quantity = qtyMatch ? parseFloat(qtyMatch[1]!) : null;
+				const quantity = qtyMatch ? parseFloat(qtyMatch[1]!) * (recipe.cook_multiplier ?? 1) : null;
 				const itemText = qtyMatch ? qtyMatch[2]!.trim() : raw;
 
 				items.push({

@@ -5,11 +5,12 @@
 	import type { Recipe } from "../../utils/recipeUtils";
 	import { obsidianIcon } from "../../utils/obsidianIcon";
 
-	const { recipe, app, close, onToggleCookSoon } = $props<{
+	const { recipe, app, close, onToggleCookSoon, onSetMultiplier } = $props<{
 		recipe: Recipe;
 		app: App;
 		close: () => void;
 		onToggleCookSoon?: () => void;
+		onSetMultiplier?: (multiplier: number) => void;
 	}>();
 
 	const HIDDEN_KEYS = new Set([
@@ -28,6 +29,7 @@
 	let error = $state<string | null>(null);
 	// svelte-ignore state_referenced_locally — recipe is stable for this modal's lifetime
 	let cookSoon = $state(!!recipe.cook_soon);
+	let multiplier = $state(recipe.cook_multiplier ?? 1);
 	let renderComp: Component | null = null;
 
 	// recipe is a stable prop — capture once, it never changes for this modal
@@ -123,6 +125,14 @@
 			/>
 			Cook soon
 		</label>
+
+		{#if cookSoon}
+			<span class="multiplier">
+				<button class="mult-btn" onclick={() => { multiplier = Math.max(1, multiplier - 1); onSetMultiplier?.(multiplier); }}>−</button>
+				<span class="mult-label">×{multiplier}</span>
+				<button class="mult-btn" onclick={() => { multiplier += 1; onSetMultiplier?.(multiplier); }}>+</button>
+			</span>
+		{/if}
 
 		<button class="open-btn" onclick={openInObsidian}>
 			<span use:obsidianIcon={"square-arrow-out-up-right"} class="btn-icon"></span>
@@ -222,6 +232,36 @@
 		gap: 6px;
 		font-size: 0.9em;
 		cursor: pointer;
+	}
+
+	.multiplier {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+	}
+
+	.mult-btn {
+		background: none;
+		border: 1px solid var(--background-modifier-border);
+		border-radius: 3px;
+		cursor: pointer;
+		color: var(--text-muted);
+		font-size: 0.85em;
+		padding: 1px 6px;
+		line-height: 1.4;
+	}
+
+	.mult-btn:hover {
+		color: var(--text-normal);
+		border-color: var(--text-accent);
+	}
+
+	.mult-label {
+		font-size: 0.88em;
+		color: var(--text-accent);
+		font-weight: 600;
+		min-width: 2em;
+		text-align: center;
 	}
 
 	.open-btn {

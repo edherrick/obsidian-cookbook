@@ -1,11 +1,13 @@
 <script lang="ts">
 	import { onDestroy } from "svelte";
 	import type { RecipeStores } from "../../utils/recipeStores";
-	import type { PersistedShoppingList, ShoppingItem } from "../../types";
+	import type { PersistedShoppingList, ShoppingItem, ShoppingCategory } from "../../types";
+	import { assignCategory } from "../../utils/recipeUtils";
 
-	const { stores, saveShoppingList } = $props<{
+	const { stores, saveShoppingList, shoppingCategories } = $props<{
 		stores: RecipeStores;
 		saveShoppingList: (data: PersistedShoppingList) => Promise<void>;
+		shoppingCategories: ShoppingCategory[];
 	}>();
 
 	// ─── Local state ──────────────────────────────────────────────────────────
@@ -33,7 +35,7 @@
 	onDestroy(() => unsubscribe());
 
 	// ─── Grouped recipe items ─────────────────────────────────────────────────
-	let groups = $derived(buildGroups(recipeItems, categoryOrder));
+	let groups = $derived(buildGroups([...recipeItems, ...customItems], categoryOrder));
 
 	function buildGroups(
 		items: ShoppingItem[],
@@ -88,7 +90,7 @@
 				text,
 				quantity: null,
 				checked: false,
-				category: "Custom",
+				category: assignCategory(text, shoppingCategories),
 				source: "custom",
 			},
 		];
@@ -222,15 +224,19 @@
 							<input
 								type="checkbox"
 								checked={item.checked}
-								onchange={() => toggleRecipeItem(item.id)}
+								onchange={() => item.source === "custom" ? toggleCustomItem(item.id) : toggleRecipeItem(item.id)}
 							/>
 							<span class="item-text">
 								{#if item.quantity !== null}{item.quantity}&nbsp;{/if}{item.text}
 							</span>
 							{#if item.recipeTitle}
-								<span class="item-source"
-									>{item.recipeTitle}</span
-								>
+								<span class="item-source">{item.recipeTitle}</span>
+							{/if}
+							{#if item.source === "custom"}
+								<button
+									class="remove-btn"
+									onclick={() => removeCustomItem(item.id)}
+									aria-label="Remove item">✕</button>
 							{/if}
 						</li>
 					{/each}
@@ -238,34 +244,6 @@
 			</div>
 		{/each}
 
-		<!-- Custom items section -->
-		{#if customItems.length > 0}
-			<div class="category-group custom-group">
-				<div class="category-header">
-					<span class="category-name">Other / Custom</span>
-					<span class="category-count">
-						{customItems.filter((i) => i.checked).length}/{customItems.length}
-					</span>
-				</div>
-				<ul class="item-list">
-					{#each customItems as item (item.id)}
-						<li class:checked={item.checked}>
-							<input
-								type="checkbox"
-								checked={item.checked}
-								onchange={() => toggleCustomItem(item.id)}
-							/>
-							<span class="item-text">{item.text}</span>
-							<button
-								class="remove-btn"
-								onclick={() => removeCustomItem(item.id)}
-								aria-label="Remove item">✕</button
-							>
-						</li>
-					{/each}
-				</ul>
-			</div>
-		{/if}
 	{/if}
 
 	<!-- Add custom item -->
