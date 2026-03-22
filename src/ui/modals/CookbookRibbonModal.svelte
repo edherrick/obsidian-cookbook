@@ -108,7 +108,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: 1rem;
-		min-width: 280px;
+		min-width: min(280px, 100%);
 	}
 
 	.selected-recipes h3 {
@@ -152,7 +152,8 @@
 		cursor: pointer;
 		color: var(--text-muted);
 		font-size: 0.8em;
-		padding: 0 4px;
+		padding: 4px 8px;
+		min-height: 28px;
 		line-height: 1.4;
 	}
 

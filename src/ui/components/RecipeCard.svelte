@@ -192,7 +192,8 @@
 		cursor: pointer;
 		color: var(--text-muted);
 		font-size: 0.8em;
-		padding: 0 4px;
+		padding: 4px 8px;
+		min-height: 28px;
 		line-height: 1.4;
 	}
 

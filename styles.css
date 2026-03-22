@@ -28,8 +28,15 @@
 }
 
 .modal {
-	width: 70vw !important;           /* let it grow */
-	max-width: 80vw !important;       /* cap at 90% of viewport */
+	width: min(70vw, 100%) !important;
+	max-width: min(80vw, 100%) !important;
+}
+
+@media (max-width: 500px) {
+	.modal {
+		width: 95vw !important;
+		max-width: 95vw !important;
+	}
 }
 
 .modal-content {

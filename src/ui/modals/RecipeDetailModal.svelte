@@ -247,7 +247,8 @@
 		cursor: pointer;
 		color: var(--text-muted);
 		font-size: 0.85em;
-		padding: 1px 6px;
+		padding: 4px 10px;
+		min-height: 32px;
 		line-height: 1.4;
 	}
 
