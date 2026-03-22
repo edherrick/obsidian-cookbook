@@ -285,7 +285,7 @@ export class CookbookSettingTab extends PluginSettingTab {
 					const btn = actions.createEl("button");
 					btn.title = tooltip;
 					if (danger) btn.addClass("is-danger");
-					setIcon(btn, icon);
+					requestAnimationFrame(() => setIcon(btn, icon));
 					return btn;
 				};
 

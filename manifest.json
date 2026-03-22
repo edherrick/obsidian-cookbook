@@ -1,10 +1,10 @@
 {
-	"id": "cookbook",
+	"id": "obsidian-cookbook",
 	"name": "Cookbook",
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
 	"description": "A cookbook for Obsidian, to view / filter recipes and generate shopping lists",
-	"author": "Obsidian",
+	"author": "Digon",
 	"authorUrl": "https://github.com/edherrick",
 	"fundingUrl": "https://buymeacoffee.com/digon",
 	"isDesktopOnly": false

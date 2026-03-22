@@ -3,6 +3,7 @@
 	import RecipeCard from "../components/RecipeCard.svelte";
 	import type { App } from "obsidian";
 	import type { Recipe } from "../../utils/recipeUtils";
+	import { flushCookSoon } from "../../utils/recipeUtils";
 	import type { Readable } from "svelte/store";
 
 	const { stores, propsToShow, app } = $props<{
@@ -137,17 +138,15 @@
 
 	// ─── Cook-soon toggle ─────────────────────────────────────────────────────
 	function toggleCookSoon(path: string) {
+		let toggled: Recipe | undefined;
 		stores.recipes.update((list: Recipe[]) =>
-			list.map((r: Recipe) =>
-				r.path === path
-					? {
-							...r,
-							cook_soon: !r.cook_soon,
-							"cook-soon": !r["cook-soon"],
-						}
-					: r,
-			),
+			list.map((r: Recipe) => {
+				if (r.path !== path) return r;
+				toggled = { ...r, cook_soon: !r.cook_soon, "cook-soon": !r["cook-soon"] };
+				return toggled;
+			}),
 		);
+		if (toggled) void flushCookSoon(toggled, app);
 	}
 </script>
 

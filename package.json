@@ -1,7 +1,7 @@
 {
 	"name": "obsidian-cookbook",
 	"version": "1.0.0",
-	"description": "This is a sample plugin for Obsidian (https://obsidian.md)",
+	"description": "An Obsidian plugin to browse recipe notes, filter by frontmatter properties, and generate categorised shopping lists.",
 	"main": "main.js",
 	"type": "module",
 	"scripts": {
@@ -11,7 +11,7 @@
 		"lint": "eslint .",
 		"svelte-check": "svelte-check --tsconfig tsconfig.json"
 	},
-	"keywords": [],
+	"keywords": ["recipe", "cooking", "shopping list", "meal planning", "cookbook"],
 	"license": "0-BSD",
 	"devDependencies": {
 		"@eslint/js": "9.30.1",

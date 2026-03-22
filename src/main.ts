@@ -21,7 +21,7 @@ export default class CookbookPlugin extends Plugin {
 	async onload() {
 		await this.loadSettings();
 
-		this.recipeStores = createRecipeStores(this.app);
+		this.recipeStores = createRecipeStores();
 
 		try {
 			const initial = await getRecipes(this.app);

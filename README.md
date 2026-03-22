@@ -48,7 +48,7 @@ Both unchecked `[ ]` and already-checked `[x]` boxes are picked up — the check
 
 If a checkbox line starts with a number, the plugin treats it as a quantity:
 
-```
+```text
 - [ ] 500 beef mince      →  quantity: 500,  text: "beef mince"
 - [ ] cloves garlic       →  quantity: null, text: "cloves garlic"
 ```
@@ -70,11 +70,23 @@ Items that cannot be matched to a category fall into **Uncategorized** at the bo
 4. Back in the ribbon menu, click **Generate Shopping List** to build a shopping list from your cook-soon recipes
 5. The **Shopping List** panel opens in the right sidebar — check off items as you shop
 
+**Ribbon menu** — shows your cook-soon recipes and quick actions:
+
+![Ribbon menu](docs/ribbon-icon-modal.png)
+
+**Recipe browser** — filter and browse your recipes in a card grid:
+
+![Cookbook browser](docs/cookbook-modal.png)
+
+**Shopping list** — categorised ingredients from your cook-soon recipes:
+
+![Shopping list](docs/shopping-list.png)
+
 ## Commands
 
 | Command | Description |
 | --- | --- |
-| **Open Cookbook** | Opens the recipe browser |
+| **Browse recipes** | Opens the recipe browser |
 | **Open Shopping List** | Opens the shopping list sidebar panel |
 
 ## Settings

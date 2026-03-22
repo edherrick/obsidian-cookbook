@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { obsidianIcon } from "../../utils/obsidianIcon";
 	import { onMount } from "svelte";
-	import { getRecipes } from "../../utils/recipeUtils";
+	import { getRecipes, flushCookSoon } from "../../utils/recipeUtils";
 	import type { Recipe } from "../../utils/recipeUtils";
 
 	const { openRecipeModal, generateShoppingList, stores, app, close } =
@@ -24,17 +24,15 @@
 	});
 
 	function toggleCookSoon(path: string) {
+		let toggled: Recipe | undefined;
 		stores.recipes.update((list: Recipe[]) =>
-			list.map((r: Recipe) =>
-				r.path === path
-					? {
-							...r,
-							cook_soon: !r.cook_soon,
-							"cook-soon": !r["cook-soon"],
-						}
-					: r,
-			),
+			list.map((r: Recipe) => {
+				if (r.path !== path) return r;
+				toggled = { ...r, cook_soon: !r.cook_soon, "cook-soon": !r["cook-soon"] };
+				return toggled;
+			}),
 		);
+		if (toggled) void flushCookSoon(toggled, app);
 	}
 
 	async function handleGenerate() {
