@@ -12,11 +12,26 @@ export interface Recipe {
 	__tags: string[];
 }
 
-export async function getRecipes(app: App, cookSoonProp = "cook-soon"): Promise<Recipe[]> {
+function isIgnored(filePath: string, ignorePaths: string[]): boolean {
+	for (const p of ignorePaths) {
+		const normalized = p.replace(/\\/g, "/").trim();
+		if (!normalized) continue;
+		// Folder match: ignore path is a prefix (with trailing slash enforced)
+		const folderPrefix = normalized.endsWith("/") ? normalized : normalized + "/";
+		if (filePath.startsWith(folderPrefix)) return true;
+		// Exact file match
+		if (filePath === normalized) return true;
+	}
+	return false;
+}
+
+export async function getRecipes(app: App, cookSoonProp = "cook-soon", ignorePaths: string[] = []): Promise<Recipe[]> {
 	const files = app.vault.getFiles();
 	const recipes: Recipe[] = [];
 
 	for (const file of files) {
+		if (ignorePaths.length > 0 && isIgnored(file.path, ignorePaths)) continue;
+
 		const cache = app.metadataCache.getFileCache(file);
 		if (!cache?.frontmatter) continue;
 

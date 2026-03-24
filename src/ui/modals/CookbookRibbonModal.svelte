@@ -5,7 +5,7 @@
 	import { getRecipes, flushCookSoon } from "../../utils/recipeUtils";
 	import type { Recipe } from "../../utils/recipeUtils";
 
-	const { openRecipeModal, generateShoppingList, stores, app, close, cookSoonProp = "cook-soon" } =
+	const { openRecipeModal, generateShoppingList, stores, app, close, cookSoonProp = "cook-soon", ignorePaths = [] } =
 		$props<{
 			openRecipeModal: () => void;
 			generateShoppingList: () => Promise<void>;
@@ -13,6 +13,7 @@
 			app: import("obsidian").App;
 			close: () => void;
 			cookSoonProp?: string;
+			ignorePaths?: string[];
 		}>();
 
 	// svelte-ignore state_referenced_locally — stores is a stable reference
@@ -21,7 +22,7 @@
 	let generating = $state(false);
 
 	onMount(async () => {
-		const fresh = await getRecipes(app, cookSoonProp);
+		const fresh = await getRecipes(app, cookSoonProp, ignorePaths);
 		stores.recipes.set(fresh);
 	});
 

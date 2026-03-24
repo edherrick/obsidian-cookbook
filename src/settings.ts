@@ -8,6 +8,7 @@ export interface CookbookSettings {
 	recipesFolder?: string;
 	recipesTag?: string;
 	cookSoonProp: string;
+	ignorePaths: string[];
 	shoppingCategories: ShoppingCategory[];
 	preferredVolumeUnit?: string;
 	preferredWeightUnit?: string;
@@ -18,6 +19,7 @@ export const DEFAULT_SETTINGS: CookbookSettings = {
 	recipesFolder: ".",
 	recipesTag: "#recipe",
 	cookSoonProp: "cook-soon",
+	ignorePaths: [],
 	shoppingCategories: [
 		{
 			name: "Produce",
@@ -359,6 +361,25 @@ export class CookbookSettingTab extends PluginSettingTab {
 						void this.plugin.saveSettings();
 					}),
 			);
+
+		new Setting(containerEl)
+			.setName("Ignored files and folders")
+			.setDesc(
+				"Files or folders to exclude from the recipe library. One path per line. Folders apply to all files inside them.",
+			)
+			.addTextArea((ta) => {
+				ta.setPlaceholder("Templates/Recipe Template.md\nArchive/")
+					.setValue(this.plugin.settings.ignorePaths.join("\n"))
+					.onChange((value) => {
+						this.plugin.settings.ignorePaths = value
+							.split("\n")
+							.map((s) => s.trim())
+							.filter((s) => s.length > 0);
+						void this.plugin.saveSettings();
+					});
+				ta.inputEl.rows = 4;
+				ta.inputEl.style.width = "100%";
+			});
 
 		new Setting(containerEl)
 			.setName("Preferred volume unit")
