@@ -346,10 +346,12 @@ export class CookbookSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName("Cook-soon property")
 			.setDesc(
+				// eslint-disable-next-line obsidianmd/ui/sentence-case
 				"The frontmatter property used to mark recipes as cook-soon. Change this if your vault uses a different key (e.g. make-soon).",
 			)
 			.addText((text) =>
 				text
+					// eslint-disable-next-line obsidianmd/ui/sentence-case
 					.setPlaceholder("cook-soon")
 					.setValue(this.plugin.settings.cookSoonProp)
 					.onChange((value) => {
