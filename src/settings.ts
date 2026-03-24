@@ -1,6 +1,7 @@
 import { App, PluginSettingTab, Setting, setIcon } from "obsidian";
 import CookbookPlugin from "./main";
 import { FolderSuggest } from "./utils/suggesters/FolderSuggester";
+import { FileFolderSuggester } from "./utils/suggesters/FileFolderSuggester";
 import type { ShoppingCategory } from "./types";
 
 export interface CookbookSettings {
@@ -365,21 +366,94 @@ export class CookbookSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName("Ignored files and folders")
 			.setDesc(
-				"Files or folders to exclude from the recipe library. One path per line. Folders apply to all files inside them.",
-			)
-			.addTextArea((ta) => {
-				ta.setPlaceholder("Templates/Recipe Template.md\nArchive/")
-					.setValue(this.plugin.settings.ignorePaths.join("\n"))
-					.onChange((value) => {
-						this.plugin.settings.ignorePaths = value
-							.split("\n")
-							.map((s) => s.trim())
-							.filter((s) => s.length > 0);
-						void this.plugin.saveSettings();
-					});
-				ta.inputEl.rows = 4;
-				ta.inputEl.style.width = "100%";
+				"Files or folders to exclude from the recipe library. Folders exclude all files inside them.",
+			);
+
+		const ignoreContainer = containerEl.createDiv({ cls: "cookbook-ignore-container" });
+
+		const renderIgnoreChips = () => {
+			ignoreContainer.empty();
+
+			const chips = ignoreContainer.createDiv({ cls: "cookbook-ignore-chips" });
+			for (const p of this.plugin.settings.ignorePaths) {
+				const chip = chips.createDiv({ cls: "cookbook-ignore-chip" });
+				chip.createSpan({ text: p });
+				const removeBtn = chip.createEl("button", { text: "✕" });
+				removeBtn.title = "Remove";
+				removeBtn.addEventListener("click", () => {
+					this.plugin.settings.ignorePaths =
+						this.plugin.settings.ignorePaths.filter((x) => x !== p);
+					void this.plugin.saveSettings();
+					renderIgnoreChips();
+				});
+			}
+
+			const addRow = ignoreContainer.createDiv({ cls: "cookbook-ignore-add" });
+			const input = addRow.createEl("input", { type: "text" });
+			input.placeholder = "Add file or folder…";
+			new FileFolderSuggester(this.app, input);
+
+			const addBtn = addRow.createEl("button", { text: "Add" });
+			const doAdd = () => {
+				const val = input.value.trim();
+				if (!val || this.plugin.settings.ignorePaths.includes(val)) {
+					input.value = "";
+					return;
+				}
+				this.plugin.settings.ignorePaths = [...this.plugin.settings.ignorePaths, val];
+				void this.plugin.saveSettings();
+				renderIgnoreChips();
+			};
+			addBtn.addEventListener("click", doAdd);
+			input.addEventListener("keydown", (e) => {
+				if (e.key === "Enter") { e.preventDefault(); doAdd(); }
 			});
+		};
+
+		renderIgnoreChips();
+
+		if (!containerEl.doc.getElementById("cookbook-ignore-styles")) {
+			const style = containerEl.doc.createElement("style");
+			style.id = "cookbook-ignore-styles";
+			style.textContent = `
+				.cookbook-ignore-chips {
+					display: flex;
+					flex-wrap: wrap;
+					gap: 4px;
+					margin-bottom: 6px;
+				}
+				.cookbook-ignore-chip {
+					display: inline-flex;
+					align-items: center;
+					gap: 4px;
+					padding: 2px 8px;
+					background: var(--background-secondary-alt);
+					border: 1px solid var(--background-modifier-border);
+					border-radius: 12px;
+					font-size: 0.85em;
+				}
+				.cookbook-ignore-chip button {
+					background: none;
+					border: none;
+					cursor: pointer;
+					color: var(--text-muted);
+					padding: 0;
+					font-size: 0.8em;
+					line-height: 1;
+				}
+				.cookbook-ignore-chip button:hover { color: var(--text-error); }
+				.cookbook-ignore-add {
+					display: flex;
+					gap: 6px;
+					align-items: center;
+				}
+				.cookbook-ignore-add input {
+					flex: 1;
+					font-size: 0.88em;
+				}
+			`;
+			containerEl.doc.head.appendChild(style);
+		}
 
 		new Setting(containerEl)
 			.setName("Preferred volume unit")

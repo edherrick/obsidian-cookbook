@@ -1,4 +1,4 @@
-import { AbstractInputSuggest, App, TFolder } from "obsidian";
+import { AbstractInputSuggest, App, TFolder, setIcon } from "obsidian";
 
 export class FolderSuggest extends AbstractInputSuggest<TFolder> {
 	constructor(app: App, inputEl: HTMLInputElement) {
@@ -18,7 +18,12 @@ export class FolderSuggest extends AbstractInputSuggest<TFolder> {
 	}
 
 	renderSuggestion(folder: TFolder, el: HTMLElement): void {
-		el.setText(folder.path);
+		el.style.display = "flex";
+		el.style.alignItems = "center";
+		el.style.gap = "6px";
+		const iconEl = el.createSpan();
+		setIcon(iconEl, "folder");
+		el.createSpan({ text: folder.path });
 	}
 
 	selectSuggestion(folder: TFolder): void {
