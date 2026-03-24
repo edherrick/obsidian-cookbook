@@ -42,6 +42,7 @@
 			class="recipe-cover"
 			src={recipe[coverField]}
 			alt={recipe.title || "No title"}
+			loading="lazy"
 		/>
 	{/if}
 

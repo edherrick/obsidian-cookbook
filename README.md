@@ -7,8 +7,10 @@ An [Obsidian](https://obsidian.md) plugin to browse your recipe notes, filter th
 - **Recipe grid** — view all your recipe notes in a card layout with cover images and frontmatter fields
 - **Filters** — filter recipes by any frontmatter property; supports string matching and numeric comparisons (`<`, `=`, `>`)
 - **Cook soon** — flag recipes you plan to make this week
+- **Serving multiplier** — scale any recipe before generating the shopping list (×2, ×3, etc.) directly from the recipe card, detail view, or ribbon menu
 - **Shopping list** — generate a categorised, grouped shopping list from your cook-soon recipes
-- **Custom items** — add one-off items to the shopping list manually
+- **Smart ingredient parsing** — quantities, units, and fractions are extracted automatically; ingredients are aggregated across recipes with unit-aware conversion
+- **Custom items** — add one-off items to the shopping list manually; items are auto-categorised by keyword
 - **Drag to reorder** — rearrange shopping list categories by dragging
 - **Recipe detail** — click any recipe card to read the full note rendered inside Obsidian
 
@@ -44,20 +46,34 @@ Your method here...
 
 Both unchecked `[ ]` and already-checked `[x]` boxes are picked up — the checked state in your note does not affect the shopping list.
 
-#### Quantities
+#### Quantities and units
 
-If a checkbox line starts with a number, the plugin treats it as a quantity:
+The plugin parses quantities and units from the start of each ingredient line. Supported formats:
 
 ```text
-- [ ] 500 beef mince      →  quantity: 500,  text: "beef mince"
-- [ ] cloves garlic       →  quantity: null, text: "cloves garlic"
+- [ ] 2 cups flour            →  2 cups flour
+- [ ] 1/2 tsp salt            →  0.5 tsp salt
+- [ ] 1 1/2 cups milk         →  1.5 cups milk
+- [ ] 100g butter             →  100 g butter
+- [ ] 2-3 cloves garlic       →  2 cloves garlic  (takes lower of range)
+- [ ] ~6 cups broccoli        →  6 cups broccoli  (strips ~ marker)
+- [ ] olive oil               →  olive oil        (no quantity)
 ```
+
+Recognised units include: `tsp`, `tbsp`, `cup/cups`, `pt`, `qt`, `gal`, `ml`, `l`, `fl oz` (volume) and `g`, `kg`, `oz`, `lb/lbs` (weight).
+
+#### Serving multiplier
+
+Each cook-soon recipe has a `− ×1 +` stepper available on the recipe card, in the detail view, and in the ribbon menu. Setting a recipe to ×2 doubles all its quantities in the generated shopping list.
 
 #### Aggregation across recipes
 
 When you generate a shopping list from multiple cook-soon recipes, identical ingredients (matched case-insensitively) are **merged into a single line**:
 
-- Quantities are **summed** — `200g pasta` from one recipe and `200g pasta` from another becomes `400 pasta`
+- **Same unit** — quantities are summed directly (`1 cup flour` + `2 cups flour` = `3 cups flour`)
+- **Different units, same type** — converted to a common base and summed (`1 cup milk` + `4 tbsp milk` = `1.25 cups milk`)
+- **Incompatible units** (e.g. cups vs grams) — kept as separate entries
+- **No unit** — aggregated by name as before
 - The source recipe titles are **combined** and shown as a label under the item so you know where it came from
 
 Items that cannot be matched to a category fall into **Uncategorized** at the bottom of the list.
@@ -65,10 +81,11 @@ Items that cannot be matched to a category fall into **Uncategorized** at the bo
 ### Using the plugin
 
 1. Click the **utensils icon** in the ribbon to open the quick-access menu
-2. Select **Open Cookbook** to browse and filter your recipes
+2. Select **Browse recipes** to browse and filter your recipes
 3. Mark recipes as **Cook soon** using the checkbox on each card or in the detail view
-4. Back in the ribbon menu, click **Generate Shopping List** to build a shopping list from your cook-soon recipes
-5. The **Shopping List** panel opens in the right sidebar — check off items as you shop
+4. Optionally adjust the **serving multiplier** (`− ×1 +`) on any cook-soon recipe to scale its quantities
+5. Back in the ribbon menu, click **Generate Shopping List** to build a shopping list from your cook-soon recipes
+6. The **Shopping List** panel opens in the right sidebar — check off items as you shop
 
 **Ribbon menu** — shows your cook-soon recipes and quick actions:
 
@@ -107,7 +124,7 @@ The tag that identifies a note as a recipe. Defaults to `#recipe`.
 
 Define keyword-based categories to group shopping list items. When a shopping list is generated, each ingredient is matched against your category keywords and grouped accordingly. Unmatched items go to **Uncategorized**.
 
-Default categories: Produce, Dairy & Eggs, Meat & Fish, Pantry.
+Default categories: Produce, Dairy & Eggs, Meat & Fish, Pantry, Frozen, Bakery.
 
 You can add, remove, reorder, and edit categories and their keywords from the settings tab.
 

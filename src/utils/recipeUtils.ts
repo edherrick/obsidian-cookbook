@@ -77,44 +77,177 @@ export function assignCategory(text: string, categories: ShoppingCategory[]): st
 	return "Uncategorized";
 }
 
+// ─── Unit conversion tables ───────────────────────────────────────────────────
+
+/** Volume units → ml */
+const VOLUME_ML: Record<string, number> = {
+	tsp: 4.92, teaspoon: 4.92, teaspoons: 4.92,
+	tbsp: 14.79, tablespoon: 14.79, tablespoons: 14.79, tbs: 14.79,
+	"fl oz": 29.57, "fluid oz": 29.57,
+	cup: 236.59, cups: 236.59,
+	pt: 473.18, pint: 473.18, pints: 473.18,
+	qt: 946.35, quart: 946.35, quarts: 946.35,
+	gal: 3785.41, gallon: 3785.41, gallons: 3785.41,
+	ml: 1, milliliter: 1, milliliters: 1, millilitre: 1, millilitres: 1,
+	l: 1000, liter: 1000, liters: 1000, litre: 1000, litres: 1000,
+};
+
+/** Weight units → g */
+const WEIGHT_G: Record<string, number> = {
+	g: 1, gram: 1, grams: 1,
+	kg: 1000, kilogram: 1000, kilograms: 1000,
+	oz: 28.35, ounce: 28.35, ounces: 28.35,
+	lb: 453.59, lbs: 453.59, pound: 453.59, pounds: 453.59,
+};
+
+function getUnitDimension(unit: string): "volume" | "weight" | null {
+	const u = unit.toLowerCase();
+	if (u in VOLUME_ML) return "volume";
+	if (u in WEIGHT_G) return "weight";
+	return null;
+}
+
+function toBaseUnit(qty: number, unit: string): number {
+	const u = unit.toLowerCase();
+	return qty * (VOLUME_ML[u] ?? WEIGHT_G[u] ?? 1);
+}
+
+/** Convert a base amount (ml or g) back to the preferred display unit. */
+function fromBaseUnit(base: number, dimension: "volume" | "weight", preferUnit: string): { qty: number; unit: string } {
+	const table = dimension === "volume" ? VOLUME_ML : WEIGHT_G;
+	const factor = table[preferUnit.toLowerCase()];
+	if (factor) return { qty: roundQty(base / factor), unit: preferUnit };
+	// Fallback
+	if (dimension === "volume") {
+		if (base >= 236.59) return { qty: roundQty(base / 236.59), unit: "cups" };
+		if (base >= 14.79) return { qty: roundQty(base / 14.79), unit: "tbsp" };
+		return { qty: roundQty(base / 4.92), unit: "tsp" };
+	} else {
+		if (base >= 1000) return { qty: roundQty(base / 1000), unit: "kg" };
+		return { qty: roundQty(base), unit: "g" };
+	}
+}
+
+function roundQty(n: number): number {
+	return Math.round(n * 100) / 100;
+}
+
+// ─── Ingredient parsing ───────────────────────────────────────────────────────
+
+interface ParsedIngredient {
+	quantity: number | null;
+	unit: string | null;
+	text: string;
+}
+
+/**
+ * Parse a raw ingredient string into quantity, unit, and name.
+ * Handles integers, decimals, fractions (1/2), mixed numbers (1 1/2),
+ * ranges (2-3 → first value), and approximate markers (~).
+ * Unit is only extracted if it matches a known cooking unit.
+ */
+export function parseIngredient(raw: string): ParsedIngredient {
+	// Strip leading approximate marker
+	let s = raw.replace(/^~\s*/, "").trim();
+
+	let quantity: number | null = null;
+	let rest = s;
+
+	// Mixed number: "1 1/2 cups"
+	const mixedRe = /^(\d+)\s+(\d+)\/(\d+)(?:\s+|(?=[a-zA-Z]))/;
+	// Simple fraction: "1/2 cup"
+	const fracRe = /^(\d+)\/(\d+)(?:\s+|(?=[a-zA-Z]))/;
+	// Range: "2-3 cloves" → take first value
+	const rangeRe = /^(\d+(?:\.\d+)?)-\d+(?:\.\d+)?(?:\s+|(?=[a-zA-Z]))/;
+	// Integer or decimal: "2 cups" or "100g"
+	const numRe = /^(\d+(?:\.\d+)?)(?:\s+|(?=[a-zA-Z]))/;
+
+	let qm: RegExpExecArray | null;
+	if ((qm = mixedRe.exec(s))) {
+		quantity = parseInt(qm[1]!) + parseInt(qm[2]!) / parseInt(qm[3]!);
+		rest = s.slice(qm[0].length);
+	} else if ((qm = fracRe.exec(s))) {
+		quantity = parseInt(qm[1]!) / parseInt(qm[2]!);
+		rest = s.slice(qm[0].length);
+	} else if ((qm = rangeRe.exec(s))) {
+		quantity = parseFloat(qm[1]!);
+		rest = s.slice(qm[0].length);
+	} else if ((qm = numRe.exec(s))) {
+		quantity = parseFloat(qm[1]!);
+		rest = s.slice(qm[0].length);
+	}
+
+	if (quantity === null) return { quantity: null, unit: null, text: s };
+
+	// Try to match a known unit at the start of rest (two-word first, then one-word)
+	const words = rest.trim().split(/\s+/);
+	let unit: string | null = null;
+	let textWords = words;
+
+	if (words.length >= 2) {
+		const twoWord = `${words[0]} ${words[1]}`.toLowerCase();
+		if (twoWord in VOLUME_ML) {
+			unit = twoWord;
+			textWords = words.slice(2);
+		}
+	}
+	if (!unit && words.length >= 1) {
+		const oneWord = words[0]!.toLowerCase();
+		if (oneWord in VOLUME_ML || oneWord in WEIGHT_G) {
+			unit = oneWord;
+			textWords = words.slice(1);
+		}
+	}
+
+	const text = (textWords.length > 0 ? textWords.join(" ") : rest).trim();
+	return { quantity, unit, text: text || rest.trim() };
+}
+
 export async function buildShoppingList(
 	app: App,
 	recipes: Recipe[],
 	categories: ShoppingCategory[],
 ): Promise<PersistedShoppingList> {
-	const items: ShoppingItem[] = [];
 	const checkboxRe = /^[-*]\s*\[[ xX]?\]\s*(.+)$/gm;
-	let idCounter = 0;
 
-	for (const recipe of recipes) {
-		if (!recipe.cook_soon) continue;
-		const file = app.vault.getAbstractFileByPath(recipe.path);
-		if (!(file instanceof TFile)) continue;
+	const cookSoonRecipes = recipes
+		.filter((r) => r.cook_soon)
+		.map((r) => ({ recipe: r, file: app.vault.getAbstractFileByPath(r.path) }))
+		.filter((e): e is { recipe: Recipe; file: TFile } => e.file instanceof TFile);
 
-		try {
-			const text = await app.vault.read(file);
-			checkboxRe.lastIndex = 0;
-			let m: RegExpExecArray | null;
-			while ((m = checkboxRe.exec(text)) !== null) {
-				const raw = m[1]!.trim();
-				const qtyMatch = /^([0-9]+(?:\.[0-9]+)?)\s+(.+)$/.exec(raw);
-				const quantity = qtyMatch ? parseFloat(qtyMatch[1]!) * (recipe.cook_multiplier ?? 1) : null;
-				const itemText = qtyMatch ? qtyMatch[2]!.trim() : raw;
-
-				items.push({
-					id: String(idCounter++),
-					text: itemText,
-					quantity,
-					checked: false,
-					category: assignCategory(itemText, categories),
-					source: "recipe",
-					recipeTitle: recipe.title,
-				});
+	// Read all recipe files in parallel
+	const perRecipeItems = await Promise.all(
+		cookSoonRecipes.map(async ({ recipe, file }) => {
+			const items: ShoppingItem[] = [];
+			try {
+				const text = await app.vault.read(file);
+				const re = new RegExp(checkboxRe.source, checkboxRe.flags);
+				let m: RegExpExecArray | null;
+				while ((m = re.exec(text)) !== null) {
+					const raw = m[1]!.trim();
+					const parsed = parseIngredient(raw);
+					const multiplier = recipe.cook_multiplier ?? 1;
+					const quantity = parsed.quantity !== null ? roundQty(parsed.quantity * multiplier) : null;
+					items.push({
+						id: "",
+						text: parsed.text,
+						quantity,
+						unit: parsed.unit,
+						checked: false,
+						category: assignCategory(parsed.text, categories),
+						source: "recipe",
+						recipeTitle: recipe.title,
+					});
+				}
+			} catch (e) {
+				console.error("buildShoppingList: failed reading", recipe.path, e);
 			}
-		} catch (e) {
-			console.error("buildShoppingList: failed reading", recipe.path, e);
-		}
-	}
+			return items;
+		}),
+	);
+
+	// Flatten and assign stable ids
+	const items = perRecipeItems.flat().map((item, i) => ({ ...item, id: String(i) }));
 
 	const categoryOrder = [
 		...categories.map((c) => c.name),
@@ -125,26 +258,39 @@ export async function buildShoppingList(
 }
 
 /**
- * Aggregate shopping items by normalised text (case-insensitive).
- * Items with the same text are merged: quantities are summed and recipe
- * source titles are joined into a comma-separated string.
+ * Aggregate shopping items by name + unit dimension.
+ * - Same unit: quantities are summed directly.
+ * - Different units, same dimension (both volume or both weight):
+ *   converted to a base unit, summed, and displayed in the first item's unit.
+ * - Incompatible units (volume vs weight): kept as separate entries.
+ * - Items without units: aggregated by name only (existing behaviour).
  */
 function aggregateItems(items: ShoppingItem[]): ShoppingItem[] {
 	const map = new Map<string, ShoppingItem>();
 	for (const item of items) {
-		// Normalise: lowercase, collapse whitespace, strip control chars
-		const key = item.text.toLowerCase().replace(/\s+/g, " ").trim();
+		const nameKey = item.text.toLowerCase().replace(/\s+/g, " ").trim();
+		const dimension = item.unit ? getUnitDimension(item.unit) : null;
+		// Items with incompatible units get separate keys so they don't merge
+		const key = dimension ? `${nameKey}::${dimension}` : nameKey;
+
 		const existing = map.get(key);
 		if (existing) {
 			if (existing.quantity !== null && item.quantity !== null) {
-				existing.quantity = existing.quantity + item.quantity;
+				if (!existing.unit || !item.unit || existing.unit === item.unit) {
+					// No units or same unit — plain addition
+					existing.quantity = roundQty(existing.quantity + item.quantity);
+				} else if (dimension) {
+					// Different units, same dimension — convert via base
+					const base = toBaseUnit(existing.quantity, existing.unit) + toBaseUnit(item.quantity, item.unit);
+					const converted = fromBaseUnit(base, dimension, existing.unit);
+					existing.quantity = converted.qty;
+					existing.unit = converted.unit;
+				}
 			} else if (item.quantity !== null) {
 				existing.quantity = item.quantity;
+				existing.unit = item.unit;
 			}
-			if (
-				item.recipeTitle &&
-				item.recipeTitle !== existing.recipeTitle
-			) {
+			if (item.recipeTitle && item.recipeTitle !== existing.recipeTitle) {
 				existing.recipeTitle = existing.recipeTitle
 					? `${existing.recipeTitle}, ${item.recipeTitle}`
 					: item.recipeTitle;

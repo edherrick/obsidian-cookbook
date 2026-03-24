@@ -89,6 +89,7 @@
 				id: `custom-${Date.now()}`,
 				text,
 				quantity: null,
+				unit: null,
 				checked: false,
 				category: assignCategory(text, shoppingCategories),
 				source: "custom",
@@ -227,7 +228,7 @@
 								onchange={() => item.source === "custom" ? toggleCustomItem(item.id) : toggleRecipeItem(item.id)}
 							/>
 							<span class="item-text">
-								{#if item.quantity !== null}{item.quantity}&nbsp;{/if}{item.text}
+								{#if item.quantity !== null}{item.quantity}&nbsp;{/if}{#if item.unit}{item.unit}&nbsp;{/if}{item.text}
 							</span>
 							{#if item.recipeTitle}
 								<span class="item-source">{item.recipeTitle}</span>
