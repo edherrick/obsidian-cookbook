@@ -67,7 +67,7 @@
 						<input
 							type="checkbox"
 							checked={recipe.cook_soon}
-							aria-label="Cook soon"
+							aria-label="Cook {(recipe as Recipe).title ?? (recipe as Recipe).path} soon"
 							onchange={() => toggleCookSoon(recipe.path)}
 						/>
 						<span class="recipe-title">{(recipe as Recipe).title ?? (recipe as Recipe).path}</span>

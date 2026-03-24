@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { setContext } from "svelte";
+	import { obsidianIcon } from "../../utils/obsidianIcon";
 	import RecipeCard from "../components/RecipeCard.svelte";
 	import type { App } from "obsidian";
 	import type { Recipe } from "../../utils/recipeUtils";
@@ -212,7 +213,7 @@
 				<button
 					class="filter-remove"
 					aria-label="Remove {key} filter"
-					onclick={() => removeFilter(key)}>✕</button
+					onclick={() => removeFilter(key)}><span use:obsidianIcon={"x"} aria-hidden="true"></span></button
 				>
 			</div>
 		{/each}
@@ -341,8 +342,13 @@
 		border: none;
 		cursor: pointer;
 		color: var(--text-muted);
-		padding: 0 2px;
 		font-size: 0.8em;
+		min-height: 44px;
+		min-width: 44px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
 	}
 
 	.filter-remove:hover {

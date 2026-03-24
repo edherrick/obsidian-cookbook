@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onDestroy } from "svelte";
+	import { obsidianIcon } from "../../utils/obsidianIcon";
 	import type { RecipeStores } from "../../utils/recipeStores";
 	import type { PersistedShoppingList, ShoppingItem, ShoppingCategory } from "../../types";
 	import { assignCategory } from "../../utils/recipeUtils";
@@ -214,7 +215,7 @@
 				class:reset-confirm={resetPending}
 				onclick={handleResetClick}
 				title={resetPending ? "Click again to confirm" : "Clear shopping list"}
-			>{resetPending ? "Sure?" : "↺ Reset"}</button>
+			>{#if !resetPending}<span use:obsidianIcon={"rotate-ccw"} aria-hidden="true"></span>{/if}{resetPending ? "Sure?" : "Reset"}</button>
 		{/if}
 	</div>
 
@@ -240,7 +241,7 @@
 				role="listitem"
 			>
 				<div class="category-header">
-					<span class="drag-handle" aria-hidden="true">⠿</span>
+					<span class="drag-handle" use:obsidianIcon={"grip-vertical"} aria-hidden="true"></span>
 					<span class="category-name">{group.category}</span>
 					<span class="category-count">
 						{group.items.filter((i) => i.checked).length}/{group
@@ -252,13 +253,13 @@
 							aria-label="Move {group.category} up"
 							disabled={i === 0}
 							onclick={() => moveCategory(group.category, -1)}
-						>↑</button>
+						><span use:obsidianIcon={"chevron-up"} aria-hidden="true"></span></button>
 						<button
 							class="reorder-btn"
 							aria-label="Move {group.category} down"
 							disabled={i === groups.length - 1}
 							onclick={() => moveCategory(group.category, 1)}
-						>↓</button>
+						><span use:obsidianIcon={"chevron-down"} aria-hidden="true"></span></button>
 					</div>
 				</div>
 				<ul class="item-list">
@@ -283,7 +284,7 @@
 								<button
 									class="remove-btn"
 									onclick={() => removeCustomItem(item.id)}
-									aria-label="Remove {item.text}">✕</button>
+									aria-label="Remove {item.text}"><span use:obsidianIcon={"x"} aria-hidden="true"></span></button>
 							{/if}
 						</li>
 					{/each}
@@ -418,9 +419,13 @@
 		cursor: pointer;
 		color: var(--text-muted);
 		font-size: 0.85em;
-		padding: 2px 4px;
 		border-radius: 3px;
 		line-height: 1;
+		min-height: 44px;
+		min-width: 44px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
 	}
 
 	.reorder-btn:hover:not(:disabled) {
@@ -506,9 +511,14 @@
 		cursor: pointer;
 		color: var(--text-muted);
 		font-size: 0.75em;
-		padding: 2px 4px;
 		opacity: 0.3;
 		line-height: 1;
+		min-height: 44px;
+		min-width: 44px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
 	}
 
 	@media (prefers-reduced-motion: no-preference) {

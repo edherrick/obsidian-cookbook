@@ -34,9 +34,8 @@
 		cursor: pointer;
 		color: var(--text-muted);
 		font-size: 0.85em;
-		padding: 0 10px;
-		min-height: 36px;
-		min-width: 36px;
+		padding: 0 8px;
+		min-height: 44px;
 		line-height: 1;
 	}
 

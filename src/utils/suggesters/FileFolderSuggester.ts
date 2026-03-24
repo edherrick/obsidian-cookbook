@@ -19,9 +19,7 @@ export class FileFolderSuggester extends AbstractInputSuggest<TAbstractFile> {
 	}
 
 	renderSuggestion(file: TAbstractFile, el: HTMLElement): void {
-		el.style.display = "flex";
-		el.style.alignItems = "center";
-		el.style.gap = "6px";
+		el.addClass("cookbook-suggest-item");
 		const iconEl = el.createSpan();
 		setIcon(iconEl, file instanceof TFolder ? "folder" : "file");
 		el.createSpan({ text: file.path });

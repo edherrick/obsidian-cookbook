@@ -18,9 +18,7 @@ export class FolderSuggest extends AbstractInputSuggest<TFolder> {
 	}
 
 	renderSuggestion(folder: TFolder, el: HTMLElement): void {
-		el.style.display = "flex";
-		el.style.alignItems = "center";
-		el.style.gap = "6px";
+		el.addClass("cookbook-suggest-item");
 		const iconEl = el.createSpan();
 		setIcon(iconEl, "folder");
 		el.createSpan({ text: folder.path });

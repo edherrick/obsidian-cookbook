@@ -1,3 +1,9 @@
+.cookbook-suggest-item {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
 .btn {
 	--btn-font-size: 1.05rem;
 	--btn-icon-size: 20px;
