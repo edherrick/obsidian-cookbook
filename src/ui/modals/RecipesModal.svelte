@@ -6,10 +6,11 @@
 	import { flushCookSoon } from "../../utils/recipeUtils";
 	import type { Readable } from "svelte/store";
 
-	const { stores, propsToShow, app } = $props<{
+	const { stores, propsToShow, app, cookSoonProp = "cook-soon" } = $props<{
 		stores: import("../../utils/recipeStores").RecipeStores;
 		propsToShow?: string[];
 		app: App;
+		cookSoonProp?: string;
 	}>();
 
 	// svelte-ignore state_referenced_locally
@@ -19,12 +20,13 @@
 	setContext("app", app);
 
 	// ─── Filter system ────────────────────────────────────────────────────────
+	// svelte-ignore state_referenced_locally
 	const EXCLUDED_KEYS = new Set([
 		"path",
 		"__tags",
 		"position",
 		"cook_soon",
-		"cook-soon",
+		cookSoonProp,
 		"tags",
 		"title",
 		"cover",
@@ -142,11 +144,11 @@
 		stores.recipes.update((list: Recipe[]) =>
 			list.map((r: Recipe) => {
 				if (r.path !== path) return r;
-				toggled = { ...r, cook_soon: !r.cook_soon, "cook-soon": !r["cook-soon"] };
+				toggled = { ...r, cook_soon: !r.cook_soon, [cookSoonProp]: !r[cookSoonProp] };
 				return toggled;
 			}),
 		);
-		if (toggled) void flushCookSoon(toggled, app);
+		if (toggled) void flushCookSoon(toggled, app, cookSoonProp);
 	}
 
 	function setMultiplier(path: string, multiplier: number) {
@@ -209,6 +211,7 @@
 
 				<button
 					class="filter-remove"
+					aria-label="Remove {key} filter"
 					onclick={() => removeFilter(key)}>✕</button
 				>
 			</div>
@@ -267,6 +270,7 @@
 					{app}
 					onToggleCookSoon={() => toggleCookSoon((recipe as Recipe).path)}
 					onSetMultiplier={(path, m) => setMultiplier(path, m)}
+					{cookSoonProp}
 				/>
 			{/each}
 		{/if}
@@ -295,7 +299,8 @@
 		display: flex;
 		align-items: center;
 		gap: 4px;
-		background: var(--background-modifier-border);
+		background: var(--background-secondary-alt);
+		border: 1px solid var(--background-modifier-border);
 		border-radius: 4px;
 		padding: 2px 6px;
 		font-size: 0.85em;

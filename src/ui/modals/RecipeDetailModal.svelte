@@ -3,7 +3,7 @@
 	import { MarkdownRenderer, Component, TFile } from "obsidian";
 	import type { App } from "obsidian";
 	import type { Recipe } from "../../utils/recipeUtils";
-	import { obsidianIcon } from "../../utils/obsidianIcon";
+	import MultiplierControl from "../components/MultiplierControl.svelte";
 
 	const { recipe, app, close, onToggleCookSoon, onSetMultiplier } = $props<{
 		recipe: Recipe;
@@ -27,9 +27,13 @@
 	let contentEl: HTMLDivElement;
 	let loading = $state(true);
 	let error = $state<string | null>(null);
-	// svelte-ignore state_referenced_locally — recipe is stable for this modal's lifetime
-	let cookSoon = $state(!!recipe.cook_soon);
-	let multiplier = $state(recipe.cook_multiplier ?? 1);
+	// recipe is stable for this modal's lifetime — capture initial values as plain consts
+	// svelte-ignore state_referenced_locally
+	const initialCookSoon = !!recipe.cook_soon;
+	// svelte-ignore state_referenced_locally
+	const initialMultiplier = recipe.cook_multiplier ?? 1;
+	let cookSoon = $state(initialCookSoon);
+	let multiplier = $state(initialMultiplier);
 	let renderComp: Component | null = null;
 
 	// recipe is a stable prop — capture once, it never changes for this modal
@@ -80,16 +84,13 @@
 		onToggleCookSoon?.();
 	}
 
-	function openInObsidian() {
-		app.workspace.openLinkText(recipe.path, "", false);
-		close();
-	}
+
 </script>
 
 <div class="recipe-detail">
 	<!-- Cover -->
 	{#if recipe.cover}
-		<img class="cover" src={recipe.cover} alt={recipe.title} />
+		<img class="cover" src={recipe.cover} alt={recipe.title} loading="lazy" />
 	{/if}
 
 	<!-- Header -->
@@ -127,17 +128,13 @@
 		</label>
 
 		{#if cookSoon}
-			<span class="multiplier">
-				<button class="mult-btn" onclick={() => { multiplier = Math.max(1, multiplier - 1); onSetMultiplier?.(multiplier); }}>−</button>
-				<span class="mult-label">×{multiplier}</span>
-				<button class="mult-btn" onclick={() => { multiplier += 1; onSetMultiplier?.(multiplier); }}>+</button>
-			</span>
+			<MultiplierControl
+				value={multiplier}
+				onDecrement={() => { multiplier = Math.max(1, multiplier - 1); onSetMultiplier?.(multiplier); }}
+				onIncrement={() => { multiplier += 1; onSetMultiplier?.(multiplier); }}
+			/>
 		{/if}
 
-		<button class="open-btn" onclick={openInObsidian}>
-			<span use:obsidianIcon={"square-arrow-out-up-right"} class="btn-icon"></span>
-			Open in Obsidian
-		</button>
 	</div>
 
 	<hr class="divider" />
@@ -232,50 +229,6 @@
 		gap: 6px;
 		font-size: 0.9em;
 		cursor: pointer;
-	}
-
-	.multiplier {
-		display: flex;
-		align-items: center;
-		gap: 4px;
-	}
-
-	.mult-btn {
-		background: none;
-		border: 1px solid var(--background-modifier-border);
-		border-radius: 3px;
-		cursor: pointer;
-		color: var(--text-muted);
-		font-size: 0.85em;
-		padding: 4px 10px;
-		min-height: 32px;
-		line-height: 1.4;
-	}
-
-	.mult-btn:hover {
-		color: var(--text-normal);
-		border-color: var(--text-accent);
-	}
-
-	.mult-label {
-		font-size: 0.88em;
-		color: var(--text-accent);
-		font-weight: 600;
-		min-width: 2em;
-		text-align: center;
-	}
-
-	.open-btn {
-		display: flex;
-		align-items: center;
-		gap: 5px;
-		font-size: 0.85em;
-		margin-left: auto;
-	}
-
-	.btn-icon {
-		width: 14px;
-		height: 14px;
 	}
 
 	.divider {

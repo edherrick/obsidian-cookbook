@@ -12,7 +12,7 @@ export interface Recipe {
 	__tags: string[];
 }
 
-export async function getRecipes(app: App): Promise<Recipe[]> {
+export async function getRecipes(app: App, cookSoonProp = "cook-soon"): Promise<Recipe[]> {
 	const files = app.vault.getFiles();
 	const recipes: Recipe[] = [];
 
@@ -40,7 +40,7 @@ export async function getRecipes(app: App): Promise<Recipe[]> {
 		recipes.push({
 			...fm,
 			path: file.path,
-			cook_soon: !!fm["cook-soon"],
+			cook_soon: !!fm[cookSoonProp],
 			cook_multiplier: 1,
 			// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 			title: fm.title ?? file.basename,
@@ -51,13 +51,13 @@ export async function getRecipes(app: App): Promise<Recipe[]> {
 	return recipes;
 }
 
-export async function flushCookSoon(recipe: Recipe, app: App) {
+export async function flushCookSoon(recipe: Recipe, app: App, cookSoonProp = "cook-soon") {
 	if (!recipe.path) return;
 	const file = app.vault.getAbstractFileByPath(recipe.path);
 	if (!(file instanceof TFile)) return;
 	await app.fileManager.processFrontMatter(file, (fm) => {
 		// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-		fm["cook-soon"] = !!recipe.cook_soon;
+		fm[cookSoonProp] = !!recipe.cook_soon;
 	});
 }
 

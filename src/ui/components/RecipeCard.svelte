@@ -4,6 +4,7 @@
 	import { obsidianIcon } from "../../utils/obsidianIcon";
 	import { SvelteModalWrapper } from "../../utils/SvelteModalWrapper";
 	import RecipeDetailModal from "../modals/RecipeDetailModal.svelte";
+	import MultiplierControl from "./MultiplierControl.svelte";
 
 	const app = getContext<App>("app");
 
@@ -11,7 +12,7 @@
 		recipe = {},
 		propsToShow = [] as string[],
 		coverField = "cover",
-		cookProp = "cook-soon",
+		cookSoonProp = "cook-soon",
 		onToggleCookSoon,
 		onSetMultiplier,
 	} = $props<{
@@ -19,7 +20,7 @@
 		recipe: Record<string, any>;
 		propsToShow?: string[];
 		coverField?: string;
-		cookProp?: string;
+		cookSoonProp?: string;
 		onToggleCookSoon?: (path: string) => void;
 		onSetMultiplier?: (path: string, multiplier: number) => void;
 	}>();
@@ -49,47 +50,47 @@
 	{/if}
 
 	{#if recipe.title}
-		<h1 class="recipe-title">
+		<h2 class="recipe-title">
 			<button
 				class="recipe-link"
 				onclick={openDetail}
-				title="View recipe"
+				aria-label="View recipe: {recipe.title}"
 			>
 				<span class="title-text">{recipe.title}</span>
 				<span
 					use:obsidianIcon={"eye"}
 					class="recipe-icon"
+					aria-hidden="true"
 				></span>
 			</button>
-		</h1>
+		</h2>
 	{/if}
 
 	<div class="recipe-body">
-		{#each propsToShow.filter((key: string) => key in recipe && key !== "title" && key !== coverField) as key (key)}
-			{#if key !== cookProp}
-				<span class="field-key">{key}</span>
-				<span class="field-colon">:</span>
-				<span class="field-value">{recipe[key]}</span>
-			{:else}
-				<span class="field-key">{key}</span>
-				<span class="field-colon">:</span>
-				<span class="field-value cook-soon-row">
-					<input
-						type="checkbox"
-						checked={recipe[cookProp]}
-						onchange={() =>
-							onToggleCookSoon && onToggleCookSoon(recipe.path)}
-					/>
-					{#if recipe[cookProp]}
-						<span class="multiplier">
-							<button class="mult-btn" onclick={() => onSetMultiplier && onSetMultiplier(recipe.path, Math.max(1, (recipe.cook_multiplier ?? 1) - 1))}>−</button>
-							<span class="mult-label">×{recipe.cook_multiplier ?? 1}</span>
-							<button class="mult-btn" onclick={() => onSetMultiplier && onSetMultiplier(recipe.path, (recipe.cook_multiplier ?? 1) + 1)}>+</button>
-						</span>
-					{/if}
-				</span>
-			{/if}
+		{#each propsToShow.filter((key: string) => key in recipe && key !== "title" && key !== coverField && key !== cookSoonProp) as key (key)}
+			<span class="field-key">{key}</span>
+			<span class="field-colon">:</span>
+			<span class="field-value">{recipe[key]}</span>
 		{/each}
+
+		<!-- Cook-soon toggle always shown -->
+		<span class="field-key">cook soon</span>
+		<span class="field-colon">:</span>
+		<span class="field-value cook-soon-row">
+			<input
+				type="checkbox"
+				aria-label="Cook {recipe.title ?? recipe.path} soon"
+				checked={recipe[cookSoonProp]}
+				onchange={() => onToggleCookSoon && onToggleCookSoon(recipe.path)}
+			/>
+			{#if recipe[cookSoonProp]}
+				<MultiplierControl
+					value={recipe.cook_multiplier ?? 1}
+					onDecrement={() => onSetMultiplier && onSetMultiplier(recipe.path, Math.max(1, (recipe.cook_multiplier ?? 1) - 1))}
+					onIncrement={() => onSetMultiplier && onSetMultiplier(recipe.path, (recipe.cook_multiplier ?? 1) + 1)}
+				/>
+			{/if}
+		</span>
 	</div>
 </div>
 
@@ -100,8 +101,7 @@
 		border-radius: var(--radius-m);
 		overflow: hidden;
 		width: 100%;
-		font-family: sans-serif;
-		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+		box-shadow: var(--shadow-s);
 		box-sizing: border-box;
 	}
 
@@ -125,8 +125,8 @@
 	}
 
 	.recipe-title {
-		font-size: 1.2rem;
-		font-weight: bold;
+		font-size: 1rem;
+		font-weight: 600;
 		margin: 0;
 		padding: 0.5rem;
 		text-align: center;
@@ -193,36 +193,5 @@
 		display: flex;
 		align-items: center;
 		gap: 6px;
-	}
-
-	.multiplier {
-		display: flex;
-		align-items: center;
-		gap: 2px;
-	}
-
-	.mult-btn {
-		background: none;
-		border: 1px solid var(--background-modifier-border);
-		border-radius: 3px;
-		cursor: pointer;
-		color: var(--text-muted);
-		font-size: 0.8em;
-		padding: 4px 8px;
-		min-height: 28px;
-		line-height: 1.4;
-	}
-
-	.mult-btn:hover {
-		color: var(--text-normal);
-		border-color: var(--text-accent);
-	}
-
-	.mult-label {
-		font-size: 0.82em;
-		color: var(--text-accent);
-		font-weight: 600;
-		min-width: 1.8em;
-		text-align: center;
 	}
 </style>

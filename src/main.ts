@@ -24,7 +24,7 @@ export default class CookbookPlugin extends Plugin {
 		this.recipeStores = createRecipeStores();
 
 		try {
-			const initial = await getRecipes(this.app);
+			const initial = await getRecipes(this.app, this.settings.cookSoonProp);
 			this.recipeStores.recipes.set(initial);
 		} catch (e) {
 			console.warn("Failed to populate recipes on load", e);
@@ -64,6 +64,7 @@ export default class CookbookPlugin extends Plugin {
 					app: this.app,
 					stores: this.recipeStores,
 					propsToShow: this.settings.propsToShow,
+					cookSoonProp: this.settings.cookSoonProp,
 				}).open();
 			},
 		});
@@ -76,6 +77,7 @@ export default class CookbookPlugin extends Plugin {
 					app: this.app,
 					stores,
 					propsToShow: this.settings.propsToShow,
+					cookSoonProp: this.settings.cookSoonProp,
 				}).open();
 			};
 
@@ -100,6 +102,7 @@ export default class CookbookPlugin extends Plugin {
 				generateShoppingList,
 				stores,
 				app: this.app,
+				cookSoonProp: this.settings.cookSoonProp,
 			}).open();
 		});
 
@@ -134,6 +137,9 @@ export default class CookbookPlugin extends Plugin {
 			recipesTag:
 				(data.recipesTag as string | undefined) ??
 				DEFAULT_SETTINGS.recipesTag,
+			cookSoonProp:
+				(data.cookSoonProp as string | undefined) ??
+				DEFAULT_SETTINGS.cookSoonProp,
 			shoppingCategories:
 				(data.shoppingCategories as
 					| ShoppingCategory[]

@@ -7,6 +7,7 @@ export interface CookbookSettings {
 	propsToShow: string[];
 	recipesFolder?: string;
 	recipesTag?: string;
+	cookSoonProp: string;
 	shoppingCategories: ShoppingCategory[];
 	preferredVolumeUnit?: string;
 	preferredWeightUnit?: string;
@@ -16,6 +17,7 @@ export const DEFAULT_SETTINGS: CookbookSettings = {
 	propsToShow: ["title", "cover"],
 	recipesFolder: ".",
 	recipesTag: "#recipe",
+	cookSoonProp: "cook-soon",
 	shoppingCategories: [
 		{
 			name: "Produce",
@@ -342,6 +344,21 @@ export class CookbookSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
+			.setName("Cook-soon property")
+			.setDesc(
+				"The frontmatter property used to mark recipes as cook-soon. Change this if your vault uses a different key (e.g. make-soon).",
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("cook-soon")
+					.setValue(this.plugin.settings.cookSoonProp)
+					.onChange((value) => {
+						this.plugin.settings.cookSoonProp = value.trim() || "cook-soon";
+						void this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
 			.setName("Preferred volume unit")
 			.setDesc(
 				"Unit to display when aggregating volume ingredients across recipes. Auto uses whichever unit appears first.",
@@ -352,7 +369,8 @@ export class CookbookSettingTab extends PluginSettingTab {
 					dd.addOption(u, u);
 				dd.setValue(this.plugin.settings.preferredVolumeUnit ?? "");
 				dd.onChange((value) => {
-					this.plugin.settings.preferredVolumeUnit = value || undefined;
+					this.plugin.settings.preferredVolumeUnit =
+						value || undefined;
 					void this.plugin.saveSettings();
 				});
 			});
@@ -364,11 +382,11 @@ export class CookbookSettingTab extends PluginSettingTab {
 			)
 			.addDropdown((dd) => {
 				dd.addOption("", "Auto");
-				for (const u of ["g", "kg", "oz", "lb"])
-					dd.addOption(u, u);
+				for (const u of ["g", "kg", "oz", "lb"]) dd.addOption(u, u);
 				dd.setValue(this.plugin.settings.preferredWeightUnit ?? "");
 				dd.onChange((value) => {
-					this.plugin.settings.preferredWeightUnit = value || undefined;
+					this.plugin.settings.preferredWeightUnit =
+						value || undefined;
 					void this.plugin.saveSettings();
 				});
 			});

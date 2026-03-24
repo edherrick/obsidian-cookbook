@@ -153,12 +153,37 @@
 		dragOver = null;
 	}
 
+	// ─── Keyboard category reorder ────────────────────────────────────────────
+	async function moveCategory(category: string, dir: -1 | 1) {
+		const idx = categoryOrder.indexOf(category);
+		const target = idx + dir;
+		if (target < 0 || target >= categoryOrder.length) return;
+		const newOrder = [...categoryOrder];
+		[newOrder[idx], newOrder[target]] = [newOrder[target]!, newOrder[idx]!];
+		categoryOrder = newOrder;
+		await persist();
+	}
+
 	// ─── Stats ────────────────────────────────────────────────────────────────
 	let totalItems = $derived(recipeItems.length + customItems.length);
 	let checkedCount = $derived(
 		recipeItems.filter((i) => i.checked).length +
 			customItems.filter((i) => i.checked).length,
 	);
+
+	let resetPending = $state(false);
+	let resetTimer: ReturnType<typeof setTimeout> | null = null;
+
+	function handleResetClick() {
+		if (!resetPending) {
+			resetPending = true;
+			resetTimer = setTimeout(() => { resetPending = false; }, 3000);
+			return;
+		}
+		if (resetTimer) clearTimeout(resetTimer);
+		resetPending = false;
+		void resetList();
+	}
 
 	async function resetList() {
 		recipeItems = [];
@@ -184,9 +209,12 @@
 		{/if}
 		{#if totalItems > 0}
 			<span class="progress">{checkedCount}/{totalItems}</span>
-			<button class="reset-btn" onclick={resetList} title="Clear shopping list">
-				↺ Reset
-			</button>
+			<button
+				class="reset-btn"
+				class:reset-confirm={resetPending}
+				onclick={handleResetClick}
+				title={resetPending ? "Click again to confirm" : "Clear shopping list"}
+			>{resetPending ? "Sure?" : "↺ Reset"}</button>
 		{/if}
 	</div>
 
@@ -198,7 +226,7 @@
 		</p>
 	{:else}
 		<!-- Recipe ingredient groups (draggable to reorder) -->
-		{#each groups as group (group.category)}
+		{#each groups as group, i (group.category)}
 			<div
 				class="category-group"
 				class:drag-over={dragOver === group.category}
@@ -218,18 +246,34 @@
 						{group.items.filter((i) => i.checked).length}/{group
 							.items.length}
 					</span>
+					<div class="reorder-btns" role="group" aria-label="Reorder {group.category}">
+						<button
+							class="reorder-btn"
+							aria-label="Move {group.category} up"
+							disabled={i === 0}
+							onclick={() => moveCategory(group.category, -1)}
+						>↑</button>
+						<button
+							class="reorder-btn"
+							aria-label="Move {group.category} down"
+							disabled={i === groups.length - 1}
+							onclick={() => moveCategory(group.category, 1)}
+						>↓</button>
+					</div>
 				</div>
 				<ul class="item-list">
 					{#each group.items as item (item.id)}
 						<li class:checked={item.checked}>
-							<input
-								type="checkbox"
-								checked={item.checked}
-								onchange={() => item.source === "custom" ? toggleCustomItem(item.id) : toggleRecipeItem(item.id)}
-							/>
-							<span class="item-text">
-								{#if item.quantity !== null}{item.quantity}&nbsp;{/if}{#if item.unit}{item.unit}&nbsp;{/if}{item.text}
-							</span>
+							<label class="item-label">
+								<input
+									type="checkbox"
+									checked={item.checked}
+									onchange={() => item.source === "custom" ? toggleCustomItem(item.id) : toggleRecipeItem(item.id)}
+								/>
+								<span class="item-text">
+									{#if item.quantity !== null}{item.quantity}&nbsp;{/if}{#if item.unit}{item.unit}&nbsp;{/if}{item.text}
+								</span>
+							</label>
 							{#if item.recipeTitle}
 								<span class="item-source">{item.recipeTitle}</span>
 							{/if}
@@ -237,7 +281,7 @@
 								<button
 									class="remove-btn"
 									onclick={() => removeCustomItem(item.id)}
-									aria-label="Remove item">✕</button>
+									aria-label="Remove {item.text}">✕</button>
 							{/if}
 						</li>
 					{/each}
@@ -249,7 +293,9 @@
 
 	<!-- Add custom item -->
 	<div class="add-row">
+		<label class="sr-only" for="shopping-add-input">Add item to list</label>
 		<input
+			id="shopping-add-input"
 			bind:value={newItemText}
 			placeholder="Add item (e.g. toothpaste)"
 			onkeydown={(e) => e.key === "Enter" && addCustomItem()}
@@ -279,7 +325,8 @@
 	.header h3 {
 		margin: 0;
 		flex: 1;
-		font-size: 1em;
+		font-size: 1.1em;
+		font-weight: 600;
 	}
 
 	.generated-at {
@@ -304,7 +351,8 @@
 		white-space: nowrap;
 	}
 
-	.reset-btn:hover {
+	.reset-btn:hover,
+	.reset-btn.reset-confirm {
 		color: var(--text-error);
 		border-color: var(--text-error);
 	}
@@ -320,7 +368,12 @@
 	.category-group {
 		border: 1px solid var(--background-modifier-border);
 		border-radius: 6px;
-		transition: border-color 0.15s, opacity 0.15s;
+	}
+
+	@media (prefers-reduced-motion: no-preference) {
+		.category-group {
+			transition: border-color 0.15s, opacity 0.15s;
+		}
 	}
 
 	.category-group.drag-over {
@@ -343,6 +396,39 @@
 		user-select: none;
 		cursor: grab;
 		border-radius: 5px 5px 0 0;
+	}
+
+	.reorder-btns {
+		display: flex;
+		gap: 2px;
+		opacity: 0;
+		transition: opacity 0.1s;
+	}
+
+	.category-header:focus-within .reorder-btns,
+	.category-header:hover .reorder-btns {
+		opacity: 1;
+	}
+
+	.reorder-btn {
+		background: none;
+		border: none;
+		cursor: pointer;
+		color: var(--text-muted);
+		font-size: 0.85em;
+		padding: 2px 4px;
+		border-radius: 3px;
+		line-height: 1;
+	}
+
+	.reorder-btn:hover:not(:disabled) {
+		color: var(--text-normal);
+		background: var(--background-modifier-hover);
+	}
+
+	.reorder-btn:disabled {
+		opacity: 0.3;
+		cursor: default;
 	}
 
 	.drag-handle {
@@ -381,6 +467,14 @@
 		background: var(--background-modifier-hover);
 	}
 
+	.item-label {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		flex: 1;
+		cursor: pointer;
+	}
+
 	.item-text {
 		flex: 1;
 	}
@@ -403,14 +497,32 @@
 		cursor: pointer;
 		color: var(--text-muted);
 		font-size: 0.75em;
-		padding: 0 2px;
-		opacity: 0;
-		transition: opacity 0.1s;
+		padding: 2px 4px;
+		opacity: 0.3;
 		line-height: 1;
 	}
 
-	li:hover .remove-btn {
+	@media (prefers-reduced-motion: no-preference) {
+		.remove-btn {
+			transition: opacity 0.1s;
+		}
+	}
+
+	li:hover .remove-btn,
+	.remove-btn:focus {
 		opacity: 1;
+	}
+
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border: 0;
 	}
 
 	.add-row {

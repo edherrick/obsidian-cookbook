@@ -1,16 +1,18 @@
 <script lang="ts">
 	import { obsidianIcon } from "../../utils/obsidianIcon";
 	import { onMount } from "svelte";
+	import MultiplierControl from "../components/MultiplierControl.svelte";
 	import { getRecipes, flushCookSoon } from "../../utils/recipeUtils";
 	import type { Recipe } from "../../utils/recipeUtils";
 
-	const { openRecipeModal, generateShoppingList, stores, app, close } =
+	const { openRecipeModal, generateShoppingList, stores, app, close, cookSoonProp = "cook-soon" } =
 		$props<{
 			openRecipeModal: () => void;
 			generateShoppingList: () => Promise<void>;
 			stores: import("../../utils/recipeStores").RecipeStores;
 			app: import("obsidian").App;
 			close: () => void;
+			cookSoonProp?: string;
 		}>();
 
 	// svelte-ignore state_referenced_locally — stores is a stable reference
@@ -19,7 +21,7 @@
 	let generating = $state(false);
 
 	onMount(async () => {
-		const fresh = await getRecipes(app);
+		const fresh = await getRecipes(app, cookSoonProp);
 		stores.recipes.set(fresh);
 	});
 
@@ -28,11 +30,11 @@
 		stores.recipes.update((list: Recipe[]) =>
 			list.map((r: Recipe) => {
 				if (r.path !== path) return r;
-				toggled = { ...r, cook_soon: !r.cook_soon, "cook-soon": !r["cook-soon"] };
+				toggled = { ...r, cook_soon: !r.cook_soon, [cookSoonProp]: !r[cookSoonProp] };
 				return toggled;
 			}),
 		);
-		if (toggled) void flushCookSoon(toggled, app);
+		if (toggled) void flushCookSoon(toggled, app, cookSoonProp);
 	}
 
 	function setMultiplier(path: string, multiplier: number) {
@@ -64,13 +66,16 @@
 						<input
 							type="checkbox"
 							checked={recipe.cook_soon}
+							aria-label="Cook soon"
 							onchange={() => toggleCookSoon(recipe.path)}
 						/>
 						<span class="recipe-title">{(recipe as Recipe).title ?? (recipe as Recipe).path}</span>
-						<span class="multiplier">
-							<button class="mult-btn" onclick={() => setMultiplier(recipe.path, Math.max(1, (recipe.cook_multiplier ?? 1) - 1))}>−</button>
-							<span class="mult-label">×{recipe.cook_multiplier ?? 1}</span>
-							<button class="mult-btn" onclick={() => setMultiplier(recipe.path, (recipe.cook_multiplier ?? 1) + 1)}>+</button>
+						<span class="mult-push">
+							<MultiplierControl
+								value={recipe.cook_multiplier ?? 1}
+								onDecrement={() => setMultiplier(recipe.path, Math.max(1, (recipe.cook_multiplier ?? 1) - 1))}
+								onIncrement={() => setMultiplier(recipe.path, (recipe.cook_multiplier ?? 1) + 1)}
+							/>
 						</span>
 					</li>
 				{/each}
@@ -138,36 +143,9 @@
 		flex: 1;
 	}
 
-	.multiplier {
-		display: flex;
-		align-items: center;
-		gap: 2px;
+	.mult-push {
 		margin-left: auto;
-	}
-
-	.mult-btn {
-		background: none;
-		border: 1px solid var(--background-modifier-border);
-		border-radius: 3px;
-		cursor: pointer;
-		color: var(--text-muted);
-		font-size: 0.8em;
-		padding: 4px 8px;
-		min-height: 28px;
-		line-height: 1.4;
-	}
-
-	.mult-btn:hover {
-		color: var(--text-normal);
-		border-color: var(--text-accent);
-	}
-
-	.mult-label {
-		font-size: 0.82em;
-		color: var(--text-accent);
-		font-weight: 600;
-		min-width: 1.8em;
-		text-align: center;
+		display: flex;
 	}
 
 	.no-selection {
