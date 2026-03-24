@@ -270,13 +270,15 @@
 									checked={item.checked}
 									onchange={() => item.source === "custom" ? toggleCustomItem(item.id) : toggleRecipeItem(item.id)}
 								/>
-								<span class="item-text">
-									{#if item.quantity !== null}{item.quantity}&nbsp;{/if}{#if item.unit}{item.unit}&nbsp;{/if}{item.text}
+								<span class="item-content">
+									<span class="item-text">
+										{#if item.quantity !== null}{item.quantity}&nbsp;{/if}{#if item.unit}{item.unit}&nbsp;{/if}{item.text}
+									</span>
+									{#if item.recipeTitle}
+										<span class="item-source">{item.recipeTitle}</span>
+									{/if}
 								</span>
 							</label>
-							{#if item.recipeTitle}
-								<span class="item-source">{item.recipeTitle}</span>
-							{/if}
 							{#if item.source === "custom"}
 								<button
 									class="remove-btn"
@@ -457,7 +459,7 @@
 
 	.item-list li {
 		display: flex;
-		align-items: center;
+		align-items: flex-start;
 		gap: 6px;
 		padding: 3px 8px;
 		font-size: 0.88em;
@@ -469,14 +471,22 @@
 
 	.item-label {
 		display: flex;
-		align-items: center;
+		align-items: flex-start;
 		gap: 6px;
 		flex: 1;
 		cursor: pointer;
 	}
 
-	.item-text {
+	.item-content {
+		display: flex;
+		flex-direction: column;
 		flex: 1;
+		min-width: 0;
+	}
+
+	.item-text {
+		overflow-wrap: break-word;
+		word-break: break-word;
 	}
 
 	li.checked .item-text {
@@ -488,7 +498,6 @@
 		font-size: 0.75em;
 		color: var(--text-faint);
 		font-style: italic;
-		white-space: nowrap;
 	}
 
 	.remove-btn {

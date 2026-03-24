@@ -20,11 +20,23 @@
 	white-space: nowrap;
 }
 
-.btn-row{
-    display: flex;
-    justify-content: center;
-    gap: 0.7rem;
-    margin-bottom: auto;
+.btn-row {
+	display: flex;
+	justify-content: center;
+	gap: 0.7rem;
+	margin-bottom: auto;
+	flex-wrap: wrap;
+}
+
+@media (max-width: 480px) {
+	.btn-row {
+		flex-direction: column;
+	}
+
+	.btn-row .btn {
+		width: 100%;
+		justify-content: center;
+	}
 }
 
 .modal {
