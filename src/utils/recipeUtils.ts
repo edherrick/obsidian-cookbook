@@ -79,26 +79,34 @@ export function assignCategory(text: string, categories: ShoppingCategory[]): st
 
 // ─── Unit conversion tables ───────────────────────────────────────────────────
 
+function buildUnitTable(entries: { factor: number; aliases: string[] }[]): Record<string, number> {
+	const table: Record<string, number> = {};
+	for (const { factor, aliases } of entries) {
+		for (const alias of aliases) table[alias] = factor;
+	}
+	return table;
+}
+
 /** Volume units → ml */
-const VOLUME_ML: Record<string, number> = {
-	tsp: 4.92, teaspoon: 4.92, teaspoons: 4.92,
-	tbsp: 14.79, tablespoon: 14.79, tablespoons: 14.79, tbs: 14.79,
-	"fl oz": 29.57, "fluid oz": 29.57,
-	cup: 236.59, cups: 236.59,
-	pt: 473.18, pint: 473.18, pints: 473.18,
-	qt: 946.35, quart: 946.35, quarts: 946.35,
-	gal: 3785.41, gallon: 3785.41, gallons: 3785.41,
-	ml: 1, milliliter: 1, milliliters: 1, millilitre: 1, millilitres: 1,
-	l: 1000, liter: 1000, liters: 1000, litre: 1000, litres: 1000,
-};
+const VOLUME_ML = buildUnitTable([
+	{ factor: 4.92,     aliases: ["tsp", "teaspoon", "teaspoons"] },
+	{ factor: 14.79,    aliases: ["tbsp", "tablespoon", "tablespoons", "tbs"] },
+	{ factor: 29.57,    aliases: ["fl oz", "fluid oz"] },
+	{ factor: 236.59,   aliases: ["cup", "cups"] },
+	{ factor: 473.18,   aliases: ["pt", "pint", "pints"] },
+	{ factor: 946.35,   aliases: ["qt", "quart", "quarts"] },
+	{ factor: 3785.41,  aliases: ["gal", "gallon", "gallons"] },
+	{ factor: 1,        aliases: ["ml", "milliliter", "milliliters", "millilitre", "millilitres"] },
+	{ factor: 1000,     aliases: ["l", "liter", "liters", "litre", "litres"] },
+]);
 
 /** Weight units → g */
-const WEIGHT_G: Record<string, number> = {
-	g: 1, gram: 1, grams: 1,
-	kg: 1000, kilogram: 1000, kilograms: 1000,
-	oz: 28.35, ounce: 28.35, ounces: 28.35,
-	lb: 453.59, lbs: 453.59, pound: 453.59, pounds: 453.59,
-};
+const WEIGHT_G = buildUnitTable([
+	{ factor: 1,      aliases: ["g", "gram", "grams"] },
+	{ factor: 1000,   aliases: ["kg", "kilogram", "kilograms"] },
+	{ factor: 28.35,  aliases: ["oz", "ounce", "ounces"] },
+	{ factor: 453.59, aliases: ["lb", "lbs", "pound", "pounds"] },
+]);
 
 function getUnitDimension(unit: string): "volume" | "weight" | null {
 	const u = unit.toLowerCase();
@@ -203,10 +211,16 @@ export function parseIngredient(raw: string): ParsedIngredient {
 	return { quantity, unit, text: text || rest.trim() };
 }
 
+export interface DisplayUnitPrefs {
+	preferredVolumeUnit?: string;
+	preferredWeightUnit?: string;
+}
+
 export async function buildShoppingList(
 	app: App,
 	recipes: Recipe[],
 	categories: ShoppingCategory[],
+	unitPrefs?: DisplayUnitPrefs,
 ): Promise<PersistedShoppingList> {
 	const checkboxRe = /^[-*]\s*\[[ xX]?\]\s*(.+)$/gm;
 
@@ -254,7 +268,7 @@ export async function buildShoppingList(
 		"Uncategorized",
 	];
 
-	return { items: aggregateItems(items), categoryOrder, generatedAt: Date.now() };
+	return { items: aggregateItems(items, unitPrefs), categoryOrder, generatedAt: Date.now() };
 }
 
 /**
@@ -265,7 +279,7 @@ export async function buildShoppingList(
  * - Incompatible units (volume vs weight): kept as separate entries.
  * - Items without units: aggregated by name only (existing behaviour).
  */
-function aggregateItems(items: ShoppingItem[]): ShoppingItem[] {
+function aggregateItems(items: ShoppingItem[], prefs?: DisplayUnitPrefs): ShoppingItem[] {
 	const map = new Map<string, ShoppingItem>();
 	for (const item of items) {
 		const nameKey = item.text.toLowerCase().replace(/\s+/g, " ").trim();
@@ -282,7 +296,10 @@ function aggregateItems(items: ShoppingItem[]): ShoppingItem[] {
 				} else if (dimension) {
 					// Different units, same dimension — convert via base
 					const base = toBaseUnit(existing.quantity, existing.unit) + toBaseUnit(item.quantity, item.unit);
-					const converted = fromBaseUnit(base, dimension, existing.unit);
+					const preferUnit = dimension === "volume"
+						? (prefs?.preferredVolumeUnit || existing.unit)
+						: (prefs?.preferredWeightUnit || existing.unit);
+					const converted = fromBaseUnit(base, dimension, preferUnit);
 					existing.quantity = converted.qty;
 					existing.unit = converted.unit;
 				}

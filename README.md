@@ -144,6 +144,6 @@ You can add, remove, reorder, and edit categories and their keywords from the se
 
 ## Support
 
-If you find this plugin useful, you can support development here:
+Always wondered if I could make a dollar from a project. If you find this plugin useful, you can support development here:
 
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-support-yellow)](https://buymeacoffee.com/digon)

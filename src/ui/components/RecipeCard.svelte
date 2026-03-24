@@ -38,12 +38,14 @@
 
 <div class="recipe-card">
 	{#if recipe[coverField]}
-		<img
-			class="recipe-cover"
-			src={recipe[coverField]}
-			alt={recipe.title || "No title"}
-			loading="lazy"
-		/>
+		<div class="recipe-cover-wrap">
+			<img
+				class="recipe-cover"
+				src={recipe[coverField]}
+				alt={recipe.title || "No title"}
+				loading="lazy"
+			/>
+		</div>
 	{/if}
 
 	{#if recipe.title}
@@ -103,10 +105,23 @@
 		box-sizing: border-box;
 	}
 
+	/* Wrapper reserves space before the image loads, preventing layout shift.
+	   aspect-ratio scales proportionally on any card width (mobile or desktop).
+	   max-height caps it on very wide cards. */
+	.recipe-cover-wrap {
+		width: 100%;
+		aspect-ratio: 16 / 9;
+		max-height: 220px;
+		overflow: hidden;
+		background: var(--background-secondary);
+		flex-shrink: 0;
+	}
+
 	.recipe-cover {
 		width: 100%;
-		height: 180px;
+		height: 100%;
 		object-fit: cover;
+		display: block;
 	}
 
 	.recipe-title {

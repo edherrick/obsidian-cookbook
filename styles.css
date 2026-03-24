@@ -45,6 +45,8 @@
 	max-height: 80vh;
 	overflow-y: auto;
 	overflow-x: hidden;
+	/* Reserve scrollbar gutter so the grid doesn't reflow when it appears */
+	scrollbar-gutter: stable;
 	padding: 1rem;
 	box-sizing: border-box;
 }

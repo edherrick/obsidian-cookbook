@@ -85,6 +85,10 @@ export default class CookbookPlugin extends Plugin {
 					this.app,
 					recipes,
 					this.settings.shoppingCategories,
+					{
+						preferredVolumeUnit: this.settings.preferredVolumeUnit,
+						preferredWeightUnit: this.settings.preferredWeightUnit,
+					},
 				);
 				stores.shoppingList.set(list);
 				await this.saveShoppingList(list);

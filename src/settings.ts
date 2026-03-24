@@ -8,6 +8,8 @@ export interface CookbookSettings {
 	recipesFolder?: string;
 	recipesTag?: string;
 	shoppingCategories: ShoppingCategory[];
+	preferredVolumeUnit?: string;
+	preferredWeightUnit?: string;
 }
 
 export const DEFAULT_SETTINGS: CookbookSettings = {
@@ -338,6 +340,38 @@ export class CookbookSettingTab extends PluginSettingTab {
 						void this.plugin.saveSettings();
 					}),
 			);
+
+		new Setting(containerEl)
+			.setName("Preferred volume unit")
+			.setDesc(
+				"Unit to display when aggregating volume ingredients across recipes. Auto uses whichever unit appears first.",
+			)
+			.addDropdown((dd) => {
+				dd.addOption("", "Auto");
+				for (const u of ["ml", "tsp", "tbsp", "cups", "pt", "l"])
+					dd.addOption(u, u);
+				dd.setValue(this.plugin.settings.preferredVolumeUnit ?? "");
+				dd.onChange((value) => {
+					this.plugin.settings.preferredVolumeUnit = value || undefined;
+					void this.plugin.saveSettings();
+				});
+			});
+
+		new Setting(containerEl)
+			.setName("Preferred weight unit")
+			.setDesc(
+				"Unit to display when aggregating weight ingredients across recipes. Auto uses whichever unit appears first.",
+			)
+			.addDropdown((dd) => {
+				dd.addOption("", "Auto");
+				for (const u of ["g", "kg", "oz", "lb"])
+					dd.addOption(u, u);
+				dd.setValue(this.plugin.settings.preferredWeightUnit ?? "");
+				dd.onChange((value) => {
+					this.plugin.settings.preferredWeightUnit = value || undefined;
+					void this.plugin.saveSettings();
+				});
+			});
 
 		new Setting(containerEl)
 			.setName("Shopping list categories")
