@@ -45,7 +45,7 @@ export class CookbookShoppingView extends ItemView {
 			props: {
 				stores: this.stores,
 				saveShoppingList: this.persistShoppingList,
-				shoppingCategories: this.getShoppingCategories(),
+				getShoppingCategories: this.getShoppingCategories,
 			},
 		}) as Record<string, unknown>;
 	}

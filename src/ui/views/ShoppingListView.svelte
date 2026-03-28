@@ -5,10 +5,10 @@
 	import type { PersistedShoppingList, ShoppingItem, ShoppingCategory } from "../../types";
 	import { assignCategory, formatQty } from "../../utils/recipeUtils";
 
-	const { stores, saveShoppingList, shoppingCategories } = $props<{
+	const { stores, saveShoppingList, getShoppingCategories } = $props<{
 		stores: RecipeStores;
 		saveShoppingList: (data: PersistedShoppingList) => Promise<void>;
-		shoppingCategories: ShoppingCategory[];
+		getShoppingCategories: () => ShoppingCategory[];
 	}>();
 
 	// ─── Local state ──────────────────────────────────────────────────────────
@@ -100,7 +100,7 @@
 				quantity: null,
 				unit: null,
 				checked: false,
-				category: assignCategory(text, shoppingCategories),
+				category: assignCategory(text, getShoppingCategories()),
 				source: "custom",
 			},
 		];

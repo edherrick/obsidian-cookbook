@@ -5,23 +5,26 @@
 	import type { Recipe } from "../../utils/recipeUtils";
 	import MultiplierControl from "../components/MultiplierControl.svelte";
 
-	const { recipe, app, close, onToggleCookSoon, onSetMultiplier } = $props<{
+	const { recipe, app, close, onToggleCookSoon, onSetMultiplier, cookSoonProp = "cook-soon", coverProp = "cover" } = $props<{
 		recipe: Recipe;
 		app: App;
 		close: () => void;
 		onToggleCookSoon?: () => void;
 		onSetMultiplier?: (multiplier: number) => void;
+		cookSoonProp?: string;
+		coverProp?: string;
 	}>();
 
+	// svelte-ignore state_referenced_locally
 	const HIDDEN_KEYS = new Set([
 		"path",
 		"__tags",
 		"position",
 		"title",
-		"cover",
+		coverProp,
 		"tags",
 		"cook_soon",
-		"cook-soon",
+		cookSoonProp,
 	]);
 
 	let contentEl: HTMLDivElement;
@@ -89,8 +92,8 @@
 
 <div class="recipe-detail">
 	<!-- Cover -->
-	{#if recipe.cover}
-		<img class="cover" src={recipe.cover} alt={recipe.title} loading="lazy" />
+	{#if recipe[coverProp]}
+		<img class="cover" src={recipe[coverProp]} alt={recipe.title} loading="lazy" />
 	{/if}
 
 	<!-- Header -->

@@ -2,10 +2,10 @@
 	import { obsidianIcon } from "../../utils/obsidianIcon";
 	import { onMount } from "svelte";
 	import MultiplierControl from "../components/MultiplierControl.svelte";
-	import { getRecipes, flushCookSoon } from "../../utils/recipeUtils";
+	import { getRecipes, applyToggleCookSoon, applySetMultiplier } from "../../utils/recipeUtils";
 	import type { Recipe } from "../../utils/recipeUtils";
 
-	const { openRecipeModal, generateShoppingList, stores, app, close, cookSoonProp = "cook-soon", ignorePaths = [] } =
+	const { openRecipeModal, generateShoppingList, stores, app, close, cookSoonProp = "cook-soon", ignorePaths = [], recipesFolder, recipesTag = "#recipe" } =
 		$props<{
 			openRecipeModal: () => void;
 			generateShoppingList: () => Promise<void>;
@@ -14,6 +14,8 @@
 			close: () => void;
 			cookSoonProp?: string;
 			ignorePaths?: string[];
+			recipesFolder?: string;
+			recipesTag?: string;
 		}>();
 
 	// svelte-ignore state_referenced_locally — stores is a stable reference
@@ -22,28 +24,19 @@
 	let generating = $state(false);
 
 	onMount(async () => {
-		const fresh = await getRecipes(app, cookSoonProp, ignorePaths);
-		stores.recipes.set(fresh);
+		const fresh = await getRecipes(app, cookSoonProp, ignorePaths, recipesFolder, recipesTag);
+		stores.recipes.update((current: Recipe[]) => {
+			const multiplierMap = new Map(current.map((r) => [r.path, r.cook_multiplier]));
+			return fresh.map((r) => ({ ...r, cook_multiplier: multiplierMap.get(r.path) ?? 1 }));
+		});
 	});
 
 	function toggleCookSoon(path: string) {
-		let toggled: Recipe | undefined;
-		stores.recipes.update((list: Recipe[]) =>
-			list.map((r: Recipe) => {
-				if (r.path !== path) return r;
-				toggled = { ...r, cook_soon: !r.cook_soon, [cookSoonProp]: !r[cookSoonProp] };
-				return toggled;
-			}),
-		);
-		if (toggled) void flushCookSoon(toggled, app, cookSoonProp);
+		applyToggleCookSoon(stores.recipes, path, app, cookSoonProp);
 	}
 
 	function setMultiplier(path: string, multiplier: number) {
-		stores.recipes.update((list: Recipe[]) =>
-			list.map((r: Recipe) =>
-				r.path === path ? { ...r, cook_multiplier: multiplier } : r,
-			),
-		);
+		applySetMultiplier(stores.recipes, path, multiplier);
 	}
 
 	async function handleGenerate() {

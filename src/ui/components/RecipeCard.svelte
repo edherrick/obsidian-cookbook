@@ -11,15 +11,14 @@
 	const {
 		recipe = {},
 		propsToShow = [] as string[],
-		coverField = "cover",
+		coverProp = "cover",
 		cookSoonProp = "cook-soon",
 		onToggleCookSoon,
 		onSetMultiplier,
 	} = $props<{
-		app: App;
 		recipe: Record<string, any>;
 		propsToShow?: string[];
-		coverField?: string;
+		coverProp?: string;
 		cookSoonProp?: string;
 		onToggleCookSoon?: (path: string) => void;
 		onSetMultiplier?: (path: string, multiplier: number) => void;
@@ -29,6 +28,8 @@
 		new SvelteModalWrapper(app, RecipeDetailModal, {
 			recipe,
 			app,
+			cookSoonProp,
+			coverProp,
 			onToggleCookSoon: () =>
 				onToggleCookSoon && onToggleCookSoon(recipe.path),
 			onSetMultiplier: (m: number) =>
@@ -38,11 +39,11 @@
 </script>
 
 <div class="recipe-card">
-	{#if recipe[coverField]}
+	{#if recipe[coverProp]}
 		<div class="recipe-cover-wrap">
 			<img
 				class="recipe-cover"
-				src={recipe[coverField]}
+				src={recipe[coverProp]}
 				alt={recipe.title || "No title"}
 				loading="lazy"
 			/>
@@ -67,7 +68,7 @@
 	{/if}
 
 	<div class="recipe-body">
-		{#each propsToShow.filter((key: string) => key in recipe && key !== "title" && key !== coverField && key !== cookSoonProp) as key (key)}
+		{#each propsToShow.filter((key: string) => key in recipe && key !== "title" && key !== coverProp && key !== cookSoonProp) as key (key)}
 			<span class="field-key">{key}</span>
 			<span class="field-colon">:</span>
 			<span class="field-value">{recipe[key]}</span>

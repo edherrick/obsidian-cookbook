@@ -20,4 +20,4 @@ export interface ShoppingCategory {
 	keywords: string[];
 }
 
-export type IngredientGroup = ShoppingCategory;
+export interface IngredientGroup extends ShoppingCategory {}

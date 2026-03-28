@@ -24,7 +24,7 @@ export default class CookbookPlugin extends Plugin {
 		this.recipeStores = createRecipeStores(this.settings.hideCheckedItems);
 
 		try {
-			const initial = await getRecipes(this.app, this.settings.cookSoonProp, this.settings.ignorePaths);
+			const initial = await getRecipes(this.app, this.settings.cookSoonProp, this.settings.ignorePaths, this.settings.recipesFolder, this.settings.recipesTag);
 			this.recipeStores.recipes.set(initial);
 		} catch (e) {
 			console.warn("Failed to populate recipes on load", e);
@@ -65,6 +65,7 @@ export default class CookbookPlugin extends Plugin {
 					stores: this.recipeStores,
 					propsToShow: this.settings.propsToShow,
 					cookSoonProp: this.settings.cookSoonProp,
+					coverProp: this.settings.coverProp,
 					ingredientGroups: this.settings.ingredientGroups,
 				}).open();
 			},
@@ -106,6 +107,8 @@ export default class CookbookPlugin extends Plugin {
 				app: this.app,
 				cookSoonProp: this.settings.cookSoonProp,
 				ignorePaths: this.settings.ignorePaths,
+				recipesFolder: this.settings.recipesFolder,
+				recipesTag: this.settings.recipesTag,
 			}).open();
 		});
 
@@ -147,6 +150,9 @@ export default class CookbookPlugin extends Plugin {
 			cookSoonProp:
 				(data.cookSoonProp as string | undefined) ??
 				DEFAULT_SETTINGS.cookSoonProp,
+			coverProp:
+				(data.coverProp as string | undefined) ??
+				DEFAULT_SETTINGS.coverProp,
 			ignorePaths:
 				(data.ignorePaths as string[] | undefined) ??
 				DEFAULT_SETTINGS.ignorePaths,
@@ -161,20 +167,38 @@ export default class CookbookPlugin extends Plugin {
 			ingredientGroups:
 				(data.ingredientGroups as IngredientGroup[] | undefined) ??
 				DEFAULT_SETTINGS.ingredientGroups,
+			preferredVolumeUnit:
+				(data.preferredVolumeUnit as string | undefined) ??
+				DEFAULT_SETTINGS.preferredVolumeUnit,
+			preferredWeightUnit:
+				(data.preferredWeightUnit as string | undefined) ??
+				DEFAULT_SETTINGS.preferredWeightUnit,
 		};
 	}
 
-	async saveSettings() {
-		const existing =
-			((await this.loadData()) ?? {}) as Record<string, unknown>;
-		await this.saveData({ ...existing, ...this.settings });
-		this.recipeStores.hideCheckedItems.set(this.settings.hideCheckedItems);
+	private _saveQueue: Promise<void> = Promise.resolve();
+
+	private enqueue(fn: () => Promise<void>): Promise<void> {
+		const next = this._saveQueue.then(fn);
+		this._saveQueue = next.then(() => {}, () => {});
+		return next;
+	}
+
+	async saveSettings(): Promise<void> {
+		return this.enqueue(async () => {
+			const existing =
+				((await this.loadData()) ?? {}) as Record<string, unknown>;
+			await this.saveData({ ...existing, ...this.settings });
+			this.recipeStores.hideCheckedItems.set(this.settings.hideCheckedItems);
+		});
 	}
 
 	async saveShoppingList(data: PersistedShoppingList): Promise<void> {
-		const existing =
-			((await this.loadData()) ?? {}) as Record<string, unknown>;
-		await this.saveData({ ...existing, shoppingList: data });
+		return this.enqueue(async () => {
+			const existing =
+				((await this.loadData()) ?? {}) as Record<string, unknown>;
+			await this.saveData({ ...existing, shoppingList: data });
+		});
 	}
 
 	async loadShoppingList(): Promise<PersistedShoppingList | null> {

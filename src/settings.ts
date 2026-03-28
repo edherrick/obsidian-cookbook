@@ -9,6 +9,7 @@ export interface CookbookSettings {
 	recipesFolder?: string;
 	recipesTag?: string;
 	cookSoonProp: string;
+	coverProp: string;
 	ignorePaths: string[];
 	shoppingCategories: ShoppingCategory[];
 	preferredVolumeUnit?: string;
@@ -18,7 +19,8 @@ export interface CookbookSettings {
 }
 
 export const DEFAULT_SETTINGS: CookbookSettings = {
-	propsToShow: ["title", "cover"],
+	propsToShow: ["title"],
+	coverProp: "cover",
 	recipesFolder: ".",
 	recipesTag: "#recipe",
 	cookSoonProp: "cook-soon",
@@ -304,6 +306,83 @@ export class CookbookSettingTab extends PluginSettingTab {
 		this.plugin = plugin;
 	}
 
+	private renderCategoryEditor(
+		container: HTMLElement,
+		getItems: () => ShoppingCategory[],
+		options: { namePlaceholder: string; addLabel: string; reorderable?: boolean },
+	): void {
+		container.empty();
+		const items = getItems();
+		const rerender = () => this.renderCategoryEditor(container, getItems, options);
+
+		const mkBtn = (parent: HTMLElement, icon: string, tooltip: string, danger = false) => {
+			const btn = parent.createEl("button");
+			btn.title = tooltip;
+			if (danger) btn.addClass("is-danger");
+			requestAnimationFrame(() => setIcon(btn, icon));
+			return btn;
+		};
+
+		items.forEach((item, idx) => {
+			const row = container.createDiv({ cls: "cookbook-cat-row" });
+			const fields = row.createDiv({ cls: "cookbook-cat-fields" });
+
+			const nameInput = fields.createEl("input", { type: "text" });
+			nameInput.className = "cookbook-cat-name";
+			nameInput.placeholder = options.namePlaceholder;
+			nameInput.value = item.name;
+			nameInput.addEventListener("input", () => {
+				items[idx]!.name = nameInput.value;
+				void this.plugin.saveSettings();
+			});
+
+			const kwInput = fields.createEl("input", { type: "text" });
+			kwInput.className = "cookbook-cat-keywords";
+			kwInput.placeholder = "Keywords, comma-separated";
+			kwInput.value = item.keywords.join(", ");
+			kwInput.addEventListener("input", () => {
+				items[idx]!.keywords = kwInput.value
+					.split(",")
+					.map((s) => s.trim())
+					.filter((s) => s.length > 0);
+				void this.plugin.saveSettings();
+			});
+
+			const actions = row.createDiv({ cls: "cookbook-cat-actions" });
+
+			if (options.reorderable) {
+				if (idx > 0) {
+					mkBtn(actions, "arrow-up", "Move up").addEventListener("click", () => {
+						[items[idx - 1], items[idx]] = [items[idx]!, items[idx - 1]!];
+						void this.plugin.saveSettings();
+						rerender();
+					});
+				}
+				if (idx < items.length - 1) {
+					mkBtn(actions, "arrow-down", "Move down").addEventListener("click", () => {
+						[items[idx], items[idx + 1]] = [items[idx + 1]!, items[idx]!];
+						void this.plugin.saveSettings();
+						rerender();
+					});
+				}
+			}
+
+			mkBtn(actions, "trash", "Remove", true).addEventListener("click", () => {
+				items.splice(idx, 1);
+				void this.plugin.saveSettings();
+				rerender();
+			});
+		});
+
+		new Setting(container).addButton((b) =>
+			b.setButtonText(options.addLabel).setCta().onClick(() => {
+				items.push({ name: "", keywords: [] });
+				void this.plugin.saveSettings();
+				rerender();
+			}),
+		);
+	}
+
 	display(): void {
 		const { containerEl } = this;
 		containerEl.empty();
@@ -334,9 +413,13 @@ export class CookbookSettingTab extends PluginSettingTab {
 				new FolderSuggest(this.app, search.inputEl);
 				search
 					.setPlaceholder("Defaults to entire vault")
-					.setValue(this.plugin.settings.recipesFolder ?? ".")
+					.setValue(
+						this.plugin.settings.recipesFolder === "." || !this.plugin.settings.recipesFolder
+							? ""
+							: this.plugin.settings.recipesFolder,
+					)
 					.onChange((value) => {
-						this.plugin.settings.recipesFolder = value;
+						this.plugin.settings.recipesFolder = value.trim() || ".";
 						void this.plugin.saveSettings();
 					});
 			});
@@ -370,6 +453,21 @@ export class CookbookSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.cookSoonProp)
 					.onChange((value) => {
 						this.plugin.settings.cookSoonProp = value.trim() || "cook-soon";
+						void this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Cover image property")
+			.setDesc(
+				"The frontmatter property used as the recipe cover image. Change this if your vault uses a different key (e.g. thumbnail, banner).",
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("cover")
+					.setValue(this.plugin.settings.coverProp)
+					.onChange((value) => {
+						this.plugin.settings.coverProp = value.trim() || "cover";
 						void this.plugin.saveSettings();
 					}),
 			);
@@ -520,62 +618,11 @@ export class CookbookSettingTab extends PluginSettingTab {
 			.setHeading();
 
 		const ingredientGroupsContainer = containerEl.createDiv();
-
-		const renderIngredientGroups = () => {
-			ingredientGroupsContainer.empty();
-
-			const groups = this.plugin.settings.ingredientGroups;
-
-			groups.forEach((group, idx) => {
-				const row = ingredientGroupsContainer.createDiv({ cls: "cookbook-cat-row" });
-				const fields = row.createDiv({ cls: "cookbook-cat-fields" });
-
-				const nameInput = fields.createEl("input", { type: "text" });
-				nameInput.className = "cookbook-cat-name";
-				nameInput.placeholder = "Name (e.g. Dairy)";
-				nameInput.value = group.name;
-				nameInput.addEventListener("input", () => {
-					this.plugin.settings.ingredientGroups[idx]!.name = nameInput.value;
-					void this.plugin.saveSettings();
-				});
-
-				const kwInput = fields.createEl("input", { type: "text" });
-				kwInput.className = "cookbook-cat-keywords";
-				kwInput.placeholder = "Keywords, comma-separated";
-				kwInput.value = group.keywords.join(", ");
-				kwInput.addEventListener("input", () => {
-					this.plugin.settings.ingredientGroups[idx]!.keywords = kwInput.value
-						.split(",")
-						.map((s) => s.trim())
-						.filter((s) => s.length > 0);
-					void this.plugin.saveSettings();
-				});
-
-				const actions = row.createDiv({ cls: "cookbook-cat-actions" });
-				const trashBtn = actions.createEl("button");
-				trashBtn.title = "Remove";
-				trashBtn.addClass("is-danger");
-				requestAnimationFrame(() => setIcon(trashBtn, "trash"));
-				trashBtn.addEventListener("click", () => {
-					this.plugin.settings.ingredientGroups.splice(idx, 1);
-					void this.plugin.saveSettings();
-					renderIngredientGroups();
-				});
-			});
-
-			new Setting(ingredientGroupsContainer).addButton((b) =>
-				b
-					.setButtonText("Add group")
-					.setCta()
-					.onClick(() => {
-						this.plugin.settings.ingredientGroups.push({ name: "", keywords: [] });
-						void this.plugin.saveSettings();
-						renderIngredientGroups();
-					}),
-			);
-		};
-
-		renderIngredientGroups();
+		this.renderCategoryEditor(
+			ingredientGroupsContainer,
+			() => this.plugin.settings.ingredientGroups,
+			{ namePlaceholder: "Name (e.g. Dairy)", addLabel: "Add group" },
+		);
 
 		new Setting(containerEl)
 			.setName("Shopping list categories")
@@ -637,108 +684,10 @@ export class CookbookSettingTab extends PluginSettingTab {
 		}
 
 		const categoriesContainer = containerEl.createDiv();
-
-		const renderCategories = () => {
-			categoriesContainer.empty();
-
-			const cats = this.plugin.settings.shoppingCategories;
-
-			cats.forEach((cat, idx) => {
-				const row = categoriesContainer.createDiv({
-					cls: "cookbook-cat-row",
-				});
-
-				// ── Fields (name + keywords) ──────────────────────────────
-				const fields = row.createDiv({ cls: "cookbook-cat-fields" });
-
-				const nameInput = fields.createEl("input", { type: "text" });
-				nameInput.className = "cookbook-cat-name";
-				nameInput.placeholder = "Name (e.g. Produce)";
-				nameInput.value = cat.name;
-				nameInput.addEventListener("input", () => {
-					this.plugin.settings.shoppingCategories[idx]!.name =
-						nameInput.value;
-					void this.plugin.saveSettings();
-				});
-
-				const kwInput = fields.createEl("input", { type: "text" });
-				kwInput.className = "cookbook-cat-keywords";
-				kwInput.placeholder = "Keywords, comma-separated";
-				kwInput.value = cat.keywords.join(", ");
-				kwInput.addEventListener("input", () => {
-					this.plugin.settings.shoppingCategories[idx]!.keywords =
-						kwInput.value
-							.split(",")
-							.map((s) => s.trim())
-							.filter((s) => s.length > 0);
-					void this.plugin.saveSettings();
-				});
-
-				// ── Action buttons ────────────────────────────────────────
-				const actions = row.createDiv({ cls: "cookbook-cat-actions" });
-
-				const mkBtn = (
-					icon: string,
-					tooltip: string,
-					danger = false,
-				) => {
-					const btn = actions.createEl("button");
-					btn.title = tooltip;
-					if (danger) btn.addClass("is-danger");
-					requestAnimationFrame(() => setIcon(btn, icon));
-					return btn;
-				};
-
-				if (idx > 0) {
-					mkBtn("arrow-up", "Move up").addEventListener(
-						"click",
-						() => {
-							const a = cats[idx - 1]!;
-							const b = cats[idx]!;
-							cats[idx - 1] = b;
-							cats[idx] = a;
-							void this.plugin.saveSettings();
-							renderCategories();
-						},
-					);
-				}
-
-				if (idx < cats.length - 1) {
-					mkBtn("arrow-down", "Move down").addEventListener(
-						"click",
-						() => {
-							const a = cats[idx]!;
-							const b = cats[idx + 1]!;
-							cats[idx] = b;
-							cats[idx + 1] = a;
-							void this.plugin.saveSettings();
-							renderCategories();
-						},
-					);
-				}
-
-				mkBtn("trash", "Remove", true).addEventListener("click", () => {
-					this.plugin.settings.shoppingCategories.splice(idx, 1);
-					void this.plugin.saveSettings();
-					renderCategories();
-				});
-			});
-
-			new Setting(categoriesContainer).addButton((b) =>
-				b
-					.setButtonText("Add category")
-					.setCta()
-					.onClick(() => {
-						this.plugin.settings.shoppingCategories.push({
-							name: "",
-							keywords: [],
-						});
-						void this.plugin.saveSettings();
-						renderCategories();
-					}),
-			);
-		};
-
-		renderCategories();
+		this.renderCategoryEditor(
+			categoriesContainer,
+			() => this.plugin.settings.shoppingCategories,
+			{ namePlaceholder: "Name (e.g. Produce)", addLabel: "Add category", reorderable: true },
+		);
 	}
 }

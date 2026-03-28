@@ -12,7 +12,7 @@ export interface Recipe {
 	__tags: string[];
 }
 
-function isIgnored(filePath: string, ignorePaths: string[]): boolean {
+export function isIgnored(filePath: string, ignorePaths: string[]): boolean {
 	for (const p of ignorePaths) {
 		const normalized = normalizePath(p.trim());
 		if (!normalized) continue;
@@ -25,11 +25,23 @@ function isIgnored(filePath: string, ignorePaths: string[]): boolean {
 	return false;
 }
 
-export async function getRecipes(app: App, cookSoonProp = "cook-soon", ignorePaths: string[] = []): Promise<Recipe[]> {
+export async function getRecipes(
+	app: App,
+	cookSoonProp = "cook-soon",
+	ignorePaths: string[] = [],
+	recipesFolder?: string,
+	recipesTag = "#recipe",
+): Promise<Recipe[]> {
 	const files = app.vault.getFiles();
 	const recipes: Recipe[] = [];
+	const normalizedFolder =
+		recipesFolder && recipesFolder !== "."
+			? normalizePath(recipesFolder.trim())
+			: null;
+	const expectedTag = recipesTag.startsWith("#") ? recipesTag : `#${recipesTag}`;
 
 	for (const file of files) {
+		if (normalizedFolder && !file.path.startsWith(normalizedFolder + "/")) continue;
 		if (ignorePaths.length > 0 && isIgnored(file.path, ignorePaths)) continue;
 
 		const cache = app.metadataCache.getFileCache(file);
@@ -50,7 +62,7 @@ export async function getRecipes(app: App, cookSoonProp = "cook-soon", ignorePat
 			...fmTags.map((t: string) => (t.startsWith("#") ? t : `#${t}`)),
 		];
 
-		if (!normalizedTags.includes("#recipe")) continue;
+		if (!normalizedTags.includes(expectedTag)) continue;
 
 		recipes.push({
 			...fm,
@@ -78,6 +90,33 @@ export async function flushCookSoon(recipe: Recipe, app: App, cookSoonProp = "co
 
 export function toggleCookSoon(recipe: Recipe) {
 	recipe.cook_soon = !recipe.cook_soon;
+}
+
+export function applyToggleCookSoon(
+	recipesStore: import("svelte/store").Writable<Recipe[]>,
+	path: string,
+	app: App,
+	cookSoonProp: string,
+): void {
+	let toggled: Recipe | undefined;
+	recipesStore.update((list) =>
+		list.map((r) => {
+			if (r.path !== path) return r;
+			toggled = { ...r, cook_soon: !r.cook_soon, [cookSoonProp]: !r[cookSoonProp], cook_multiplier: 1 };
+			return toggled;
+		}),
+	);
+	if (toggled) void flushCookSoon(toggled, app, cookSoonProp);
+}
+
+export function applySetMultiplier(
+	recipesStore: import("svelte/store").Writable<Recipe[]>,
+	path: string,
+	multiplier: number,
+): void {
+	recipesStore.update((list) =>
+		list.map((r) => r.path === path ? { ...r, cook_multiplier: multiplier } : r),
+	);
 }
 
 export function assignCategory(text: string, categories: ShoppingCategory[]): string {
@@ -266,6 +305,18 @@ export interface DisplayUnitPrefs {
 	preferredWeightUnit?: string;
 }
 
+// ─── Checkbox parsing ─────────────────────────────────────────────────────────
+
+const CHECKBOX_RE = /^[-*]\s*\[[ xX]?\]\s*(.+)$/gm;
+
+function parseChecklistItems(text: string): ParsedIngredient[] {
+	const re = new RegExp(CHECKBOX_RE.source, CHECKBOX_RE.flags);
+	const results: ParsedIngredient[] = [];
+	let m: RegExpExecArray | null;
+	while ((m = re.exec(text)) !== null) results.push(parseIngredient(m[1]!.trim()));
+	return results;
+}
+
 // ─── Per-recipe ingredient cache ─────────────────────────────────────────────
 
 const ingredientCache = new Map<string, ParsedIngredient[]>();
@@ -278,12 +329,7 @@ export async function getRecipeIngredients(app: App, recipe: Recipe): Promise<Pa
 	if (ingredientCache.has(recipe.path)) return ingredientCache.get(recipe.path)!;
 	const file = app.vault.getFileByPath(recipe.path);
 	if (!file) return [];
-	const text = await app.vault.read(file);
-	const checkboxRe = /^[-*]\s*\[[ xX]?\]\s*(.+)$/gm;
-	const re = new RegExp(checkboxRe.source, checkboxRe.flags);
-	const results: ParsedIngredient[] = [];
-	let m: RegExpExecArray | null;
-	while ((m = re.exec(text)) !== null) results.push(parseIngredient(m[1]!.trim()));
+	const results = parseChecklistItems(await app.vault.read(file));
 	ingredientCache.set(recipe.path, results);
 	return results;
 }
@@ -299,41 +345,27 @@ export async function buildShoppingList(
 	categories: ShoppingCategory[],
 	unitPrefs?: DisplayUnitPrefs,
 ): Promise<PersistedShoppingList> {
-	const checkboxRe = /^[-*]\s*\[[ xX]?\]\s*(.+)$/gm;
+	const cookSoonRecipes = recipes.filter((r) => r.cook_soon);
 
-	const cookSoonRecipes = recipes
-		.filter((r) => r.cook_soon)
-		.map((r) => ({ recipe: r, file: app.vault.getFileByPath(r.path) }))
-		.filter((e): e is { recipe: Recipe; file: NonNullable<typeof e.file> } => e.file !== null);
-
-	// Read all recipe files in parallel
+	// Read all recipe files in parallel, reusing the per-file ingredient cache
 	const perRecipeItems = await Promise.all(
-		cookSoonRecipes.map(async ({ recipe, file }) => {
-			const items: ShoppingItem[] = [];
+		cookSoonRecipes.map(async (recipe) => {
 			try {
-				const text = await app.vault.read(file);
-				const re = new RegExp(checkboxRe.source, checkboxRe.flags);
-				let m: RegExpExecArray | null;
-				while ((m = re.exec(text)) !== null) {
-					const raw = m[1]!.trim();
-					const parsed = parseIngredient(raw);
-					const multiplier = recipe.cook_multiplier ?? 1;
-					const quantity = parsed.quantity !== null ? roundQty(parsed.quantity * multiplier) : null;
-					items.push({
-						id: "",
-						text: parsed.text,
-						quantity,
-						unit: parsed.unit,
-						checked: false,
-						category: assignCategory(parsed.text, categories),
-						source: "recipe",
-						recipeTitle: recipe.title,
-					});
-				}
+				const multiplier = recipe.cook_multiplier ?? 1;
+				return (await getRecipeIngredients(app, recipe)).map((parsed) => ({
+					id: "",
+					text: parsed.text,
+					quantity: parsed.quantity !== null ? roundQty(parsed.quantity * multiplier) : null,
+					unit: parsed.unit,
+					checked: false,
+					category: assignCategory(parsed.text, categories),
+					source: "recipe" as const,
+					recipeTitle: recipe.title,
+				}));
 			} catch (e) {
 				console.error("buildShoppingList: failed reading", recipe.path, e);
+				return [];
 			}
-			return items;
 		}),
 	);
 

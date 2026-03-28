@@ -9,3 +9,7 @@ export class TFile {
 		this.basename = path.split("/").pop()?.replace(/\.[^.]+$/, "") ?? path;
 	}
 }
+
+export function normalizePath(path: string): string {
+	return path.replace(/\\/g, "/").replace(/\/+/g, "/").replace(/\/$/, "");
+}

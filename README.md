@@ -41,9 +41,9 @@ cover: https://example.com/bolognese.jpg
 - [ ] 200g spaghetti
 - [ ] olive oil
 
-## Method
+## Steps
 
-Your method here...
+Your steps here...
 ```
 
 Both unchecked `[ ]` and already-checked `[x]` boxes are picked up — the checked state in your note does not affect the shopping list.

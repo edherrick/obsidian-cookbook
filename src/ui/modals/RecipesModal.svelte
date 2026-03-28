@@ -4,15 +4,16 @@
 	import RecipeCard from "../components/RecipeCard.svelte";
 	import type { App } from "obsidian";
 	import type { Recipe, ParsedIngredient } from "../../utils/recipeUtils";
-	import { flushCookSoon, getRecipeIngredients } from "../../utils/recipeUtils";
+	import { getRecipeIngredients, applyToggleCookSoon, applySetMultiplier } from "../../utils/recipeUtils";
 	import type { Readable } from "svelte/store";
 	import type { IngredientGroup } from "../../types";
 
-	const { stores, propsToShow, app, cookSoonProp = "cook-soon", ingredientGroups = [] } = $props<{
+	const { stores, propsToShow, app, cookSoonProp = "cook-soon", coverProp = "cover", ingredientGroups = [] } = $props<{
 		stores: import("../../utils/recipeStores").RecipeStores;
 		propsToShow?: string[];
 		app: App;
 		cookSoonProp?: string;
+		coverProp?: string;
 		ingredientGroups?: IngredientGroup[];
 	}>();
 
@@ -57,7 +58,7 @@
 		cookSoonProp,
 		"tags",
 		"title",
-		"cover",
+		coverProp,
 	]);
 
 	const HAS_INGREDIENT_KEY = "__has-ingredient";
@@ -310,23 +311,11 @@
 
 	// ─── Cook-soon toggle ─────────────────────────────────────────────────────
 	function toggleCookSoon(path: string) {
-		let toggled: Recipe | undefined;
-		stores.recipes.update((list: Recipe[]) =>
-			list.map((r: Recipe) => {
-				if (r.path !== path) return r;
-				toggled = { ...r, cook_soon: !r.cook_soon, [cookSoonProp]: !r[cookSoonProp] };
-				return toggled;
-			}),
-		);
-		if (toggled) void flushCookSoon(toggled, app, cookSoonProp);
+		applyToggleCookSoon(stores.recipes, path, app, cookSoonProp);
 	}
 
 	function setMultiplier(path: string, multiplier: number) {
-		stores.recipes.update((list: Recipe[]) =>
-			list.map((r: Recipe) =>
-				r.path === path ? { ...r, cook_multiplier: multiplier } : r,
-			),
-		);
+		applySetMultiplier(stores.recipes, path, multiplier);
 	}
 </script>
 
@@ -516,9 +505,7 @@
 	</div>
 
 	<div class="recipe-grid">
-		{#if $recipes === undefined}
-			<p>Loading recipes…</p>
-		{:else if filteredRecipes.length === 0 && activeFilters.size > 0}
+		{#if filteredRecipes.length === 0 && activeFilters.size > 0}
 			<p>No recipes match the current filters.</p>
 		{:else if $recipes.length === 0}
 			<p>
@@ -530,10 +517,10 @@
 				<RecipeCard
 					{recipe}
 					{propsToShow}
-					{app}
+					{cookSoonProp}
+					{coverProp}
 					onToggleCookSoon={() => toggleCookSoon((recipe as Recipe).path)}
 					onSetMultiplier={(path, m) => setMultiplier(path, m)}
-					{cookSoonProp}
 				/>
 			{/each}
 		{/if}
