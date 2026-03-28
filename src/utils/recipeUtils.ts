@@ -1,4 +1,4 @@
-import { TFile } from "obsidian";
+import { normalizePath } from "obsidian";
 import type { App } from "obsidian";
 import type { PersistedShoppingList, ShoppingCategory, ShoppingItem } from "../types";
 
@@ -14,7 +14,7 @@ export interface Recipe {
 
 function isIgnored(filePath: string, ignorePaths: string[]): boolean {
 	for (const p of ignorePaths) {
-		const normalized = p.replace(/\\/g, "/").trim();
+		const normalized = normalizePath(p.trim());
 		if (!normalized) continue;
 		// Folder match: ignore path is a prefix (with trailing slash enforced)
 		const folderPrefix = normalized.endsWith("/") ? normalized : normalized + "/";
@@ -68,8 +68,8 @@ export async function getRecipes(app: App, cookSoonProp = "cook-soon", ignorePat
 
 export async function flushCookSoon(recipe: Recipe, app: App, cookSoonProp = "cook-soon") {
 	if (!recipe.path) return;
-	const file = app.vault.getAbstractFileByPath(recipe.path);
-	if (!(file instanceof TFile)) return;
+	const file = app.vault.getFileByPath(recipe.path);
+	if (!file) return;
 	await app.fileManager.processFrontMatter(file, (fm) => {
 		// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
 		fm[cookSoonProp] = !!recipe.cook_soon;
@@ -276,8 +276,8 @@ const ingredientCache = new Map<string, ParsedIngredient[]>();
  */
 export async function getRecipeIngredients(app: App, recipe: Recipe): Promise<ParsedIngredient[]> {
 	if (ingredientCache.has(recipe.path)) return ingredientCache.get(recipe.path)!;
-	const file = app.vault.getAbstractFileByPath(recipe.path);
-	if (!(file instanceof TFile)) return [];
+	const file = app.vault.getFileByPath(recipe.path);
+	if (!file) return [];
 	const text = await app.vault.read(file);
 	const checkboxRe = /^[-*]\s*\[[ xX]?\]\s*(.+)$/gm;
 	const re = new RegExp(checkboxRe.source, checkboxRe.flags);
@@ -303,8 +303,8 @@ export async function buildShoppingList(
 
 	const cookSoonRecipes = recipes
 		.filter((r) => r.cook_soon)
-		.map((r) => ({ recipe: r, file: app.vault.getAbstractFileByPath(r.path) }))
-		.filter((e): e is { recipe: Recipe; file: TFile } => e.file instanceof TFile);
+		.map((r) => ({ recipe: r, file: app.vault.getFileByPath(r.path) }))
+		.filter((e): e is { recipe: Recipe; file: NonNullable<typeof e.file> } => e.file !== null);
 
 	// Read all recipe files in parallel
 	const perRecipeItems = await Promise.all(

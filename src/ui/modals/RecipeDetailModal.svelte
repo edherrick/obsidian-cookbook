@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy } from "svelte";
-	import { MarkdownRenderer, Component, TFile } from "obsidian";
+	import { MarkdownRenderer, Component } from "obsidian";
 	import type { App } from "obsidian";
 	import type { Recipe } from "../../utils/recipeUtils";
 	import MultiplierControl from "../components/MultiplierControl.svelte";
@@ -46,8 +46,8 @@
 	const tags = (recipe.__tags ?? []).map((t: string) => t.replace(/^#/, ""));
 
 	onMount(async () => {
-		const file = app.vault.getAbstractFileByPath(recipe.path);
-		if (!(file instanceof TFile)) {
+		const file = app.vault.getFileByPath(recipe.path);
+		if (!file) {
 			error = "Could not find recipe file.";
 			loading = false;
 			return;
