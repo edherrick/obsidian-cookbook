@@ -2,7 +2,7 @@ import { App, PluginSettingTab, Setting, setIcon } from "obsidian";
 import CookbookPlugin from "./main";
 import { FolderSuggest } from "./utils/suggesters/FolderSuggester";
 import { FileFolderSuggester } from "./utils/suggesters/FileFolderSuggester";
-import type { ShoppingCategory } from "./types";
+import type { ShoppingCategory, IngredientGroup } from "./types";
 
 export interface CookbookSettings {
 	propsToShow: string[];
@@ -14,6 +14,7 @@ export interface CookbookSettings {
 	preferredVolumeUnit?: string;
 	preferredWeightUnit?: string;
 	hideCheckedItems: boolean;
+	ingredientGroups: IngredientGroup[];
 }
 
 export const DEFAULT_SETTINGS: CookbookSettings = {
@@ -23,6 +24,14 @@ export const DEFAULT_SETTINGS: CookbookSettings = {
 	cookSoonProp: "cook-soon",
 	ignorePaths: [],
 	hideCheckedItems: false,
+	ingredientGroups: [
+		{ name: "Dairy",          keywords: ["milk", "butter", "cream", "cheese", "yogurt", "parmesan", "mozzarella", "cheddar", "brie", "feta", "ricotta", "ghee", "creme fraiche", "sour cream", "mascarpone", "whipping cream", "double cream", "single cream", "half and half", "cream cheese"] },
+		{ name: "Meat & Poultry", keywords: ["chicken", "beef", "pork", "lamb", "turkey", "bacon", "sausage", "mince", "steak", "duck", "veal", "ham", "pancetta", "chorizo", "salami", "pepperoni", "brisket", "venison", "lard"] },
+		{ name: "Fish & Seafood", keywords: ["salmon", "tuna", "cod", "shrimp", "prawn", "fish", "anchovy", "sardine", "crab", "lobster", "scallop", "squid", "halibut", "tilapia", "sea bass", "haddock", "mackerel", "trout", "clam", "mussel", "oyster"] },
+		{ name: "Eggs",           keywords: ["egg", "eggs"] },
+		{ name: "Nuts",           keywords: ["almond", "walnut", "pecan", "pine nut", "cashew", "peanut", "pistachio", "hazelnut", "macadamia", "nut butter", "peanut butter"] },
+		{ name: "Gluten",         keywords: ["flour", "wheat", "bread", "pasta", "noodle", "barley", "rye", "couscous", "breadcrumb", "panko", "semolina", "spelt", "bulgur"] },
+	],
 	shoppingCategories: [
 		{
 			name: "Produce",
@@ -501,6 +510,71 @@ export class CookbookSettingTab extends PluginSettingTab {
 						void this.plugin.saveSettings();
 					}),
 			);
+
+		new Setting(containerEl)
+			.setName("Ingredient groups")
+			.setDesc(
+				"Named groups used to filter recipes by dietary need (e.g. exclude Dairy, Gluten). Each group's keywords are matched against recipe ingredients.",
+			)
+			.setHeading();
+
+		const ingredientGroupsContainer = containerEl.createDiv();
+
+		const renderIngredientGroups = () => {
+			ingredientGroupsContainer.empty();
+
+			const groups = this.plugin.settings.ingredientGroups;
+
+			groups.forEach((group, idx) => {
+				const row = ingredientGroupsContainer.createDiv({ cls: "cookbook-cat-row" });
+				const fields = row.createDiv({ cls: "cookbook-cat-fields" });
+
+				const nameInput = fields.createEl("input", { type: "text" });
+				nameInput.className = "cookbook-cat-name";
+				nameInput.placeholder = "Name (e.g. Dairy)";
+				nameInput.value = group.name;
+				nameInput.addEventListener("input", () => {
+					this.plugin.settings.ingredientGroups[idx]!.name = nameInput.value;
+					void this.plugin.saveSettings();
+				});
+
+				const kwInput = fields.createEl("input", { type: "text" });
+				kwInput.className = "cookbook-cat-keywords";
+				kwInput.placeholder = "Keywords, comma-separated";
+				kwInput.value = group.keywords.join(", ");
+				kwInput.addEventListener("input", () => {
+					this.plugin.settings.ingredientGroups[idx]!.keywords = kwInput.value
+						.split(",")
+						.map((s) => s.trim())
+						.filter((s) => s.length > 0);
+					void this.plugin.saveSettings();
+				});
+
+				const actions = row.createDiv({ cls: "cookbook-cat-actions" });
+				const trashBtn = actions.createEl("button");
+				trashBtn.title = "Remove";
+				trashBtn.addClass("is-danger");
+				requestAnimationFrame(() => setIcon(trashBtn, "trash"));
+				trashBtn.addEventListener("click", () => {
+					this.plugin.settings.ingredientGroups.splice(idx, 1);
+					void this.plugin.saveSettings();
+					renderIngredientGroups();
+				});
+			});
+
+			new Setting(ingredientGroupsContainer).addButton((b) =>
+				b
+					.setButtonText("Add group")
+					.setCta()
+					.onClick(() => {
+						this.plugin.settings.ingredientGroups.push({ name: "", keywords: [] });
+						void this.plugin.saveSettings();
+						renderIngredientGroups();
+					}),
+			);
+		};
+
+		renderIngredientGroups();
 
 		new Setting(containerEl)
 			.setName("Shopping list categories")

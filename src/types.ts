@@ -19,3 +19,5 @@ export interface ShoppingCategory {
 	name: string;
 	keywords: string[];
 }
+
+export type IngredientGroup = ShoppingCategory;

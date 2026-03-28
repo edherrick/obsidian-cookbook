@@ -9,10 +9,10 @@ import {
 	CookbookShoppingView,
 } from "./ui/views/CookbookShoppingView";
 import RecipesModal from "./ui/modals/RecipesModal.svelte";
-import { getRecipes, buildShoppingList } from "./utils/recipeUtils";
+import { getRecipes, buildShoppingList, clearIngredientCache } from "./utils/recipeUtils";
 import { createRecipeStores } from "./utils/recipeStores";
 import type { RecipeStores } from "./utils/recipeStores";
-import type { PersistedShoppingList, ShoppingCategory } from "./types";
+import type { PersistedShoppingList, ShoppingCategory, IngredientGroup } from "./types";
 
 export default class CookbookPlugin extends Plugin {
 	settings: CookbookSettings;
@@ -65,6 +65,7 @@ export default class CookbookPlugin extends Plugin {
 					stores: this.recipeStores,
 					propsToShow: this.settings.propsToShow,
 					cookSoonProp: this.settings.cookSoonProp,
+					ingredientGroups: this.settings.ingredientGroups,
 				}).open();
 			},
 		});
@@ -78,6 +79,7 @@ export default class CookbookPlugin extends Plugin {
 					stores,
 					propsToShow: this.settings.propsToShow,
 					cookSoonProp: this.settings.cookSoonProp,
+					ingredientGroups: this.settings.ingredientGroups,
 				}).open();
 			};
 
@@ -106,6 +108,10 @@ export default class CookbookPlugin extends Plugin {
 				ignorePaths: this.settings.ignorePaths,
 			}).open();
 		});
+
+		this.registerEvent(
+			this.app.vault.on("modify", (file) => clearIngredientCache(file.path)),
+		);
 
 		this.addSettingTab(new CookbookSettingTab(this.app, this));
 	}
@@ -152,6 +158,9 @@ export default class CookbookPlugin extends Plugin {
 			hideCheckedItems:
 				(data.hideCheckedItems as boolean | undefined) ??
 				DEFAULT_SETTINGS.hideCheckedItems,
+			ingredientGroups:
+				(data.ingredientGroups as IngredientGroup[] | undefined) ??
+				DEFAULT_SETTINGS.ingredientGroups,
 		};
 	}
 

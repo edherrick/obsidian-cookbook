@@ -192,7 +192,7 @@ export function formatQty(n: number): string {
 
 // ─── Ingredient parsing ───────────────────────────────────────────────────────
 
-interface ParsedIngredient {
+export interface ParsedIngredient {
 	quantity: number | null;
 	unit: string | null;
 	text: string;
@@ -264,6 +264,33 @@ export function parseIngredient(raw: string): ParsedIngredient {
 export interface DisplayUnitPrefs {
 	preferredVolumeUnit?: string;
 	preferredWeightUnit?: string;
+}
+
+// ─── Per-recipe ingredient cache ─────────────────────────────────────────────
+
+const ingredientCache = new Map<string, ParsedIngredient[]>();
+
+/**
+ * Return parsed ingredients for a recipe, reading from the module-level cache
+ * when available. Call clearIngredientCache when a file is modified.
+ */
+export async function getRecipeIngredients(app: App, recipe: Recipe): Promise<ParsedIngredient[]> {
+	if (ingredientCache.has(recipe.path)) return ingredientCache.get(recipe.path)!;
+	const file = app.vault.getAbstractFileByPath(recipe.path);
+	if (!(file instanceof TFile)) return [];
+	const text = await app.vault.read(file);
+	const checkboxRe = /^[-*]\s*\[[ xX]?\]\s*(.+)$/gm;
+	const re = new RegExp(checkboxRe.source, checkboxRe.flags);
+	const results: ParsedIngredient[] = [];
+	let m: RegExpExecArray | null;
+	while ((m = re.exec(text)) !== null) results.push(parseIngredient(m[1]!.trim()));
+	ingredientCache.set(recipe.path, results);
+	return results;
+}
+
+export function clearIngredientCache(path?: string): void {
+	if (path) ingredientCache.delete(path);
+	else ingredientCache.clear();
 }
 
 export async function buildShoppingList(
