@@ -460,10 +460,12 @@ export class CookbookSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName("Cover image property")
 			.setDesc(
+				// eslint-disable-next-line obsidianmd/ui/sentence-case
 				"The frontmatter property used as the recipe cover image. Change this if your vault uses a different key (e.g. thumbnail, banner).",
 			)
 			.addText((text) =>
 				text
+					// eslint-disable-next-line obsidianmd/ui/sentence-case
 					.setPlaceholder("cover")
 					.setValue(this.plugin.settings.coverProp)
 					.onChange((value) => {
