@@ -514,7 +514,8 @@ export class CookbookSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName("Ingredient groups")
 			.setDesc(
-				"Named groups used to filter recipes by dietary need (e.g. exclude Dairy, Gluten). Each group's keywords are matched against recipe ingredients.",
+				// eslint-disable-next-line obsidianmd/ui/sentence-case
+				"Named groups used to filter recipes by dietary need (e.g. exclude dairy, gluten). Each group's keywords are matched against recipe ingredients.",
 			)
 			.setHeading();
 
