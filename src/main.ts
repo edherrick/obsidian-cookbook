@@ -21,7 +21,7 @@ export default class CookbookPlugin extends Plugin {
 	async onload() {
 		await this.loadSettings();
 
-		this.recipeStores = createRecipeStores();
+		this.recipeStores = createRecipeStores(this.settings.hideCheckedItems);
 
 		try {
 			const initial = await getRecipes(this.app, this.settings.cookSoonProp, this.settings.ignorePaths);
@@ -149,6 +149,9 @@ export default class CookbookPlugin extends Plugin {
 					| ShoppingCategory[]
 					| undefined) ??
 				DEFAULT_SETTINGS.shoppingCategories,
+			hideCheckedItems:
+				(data.hideCheckedItems as boolean | undefined) ??
+				DEFAULT_SETTINGS.hideCheckedItems,
 		};
 	}
 
@@ -156,6 +159,7 @@ export default class CookbookPlugin extends Plugin {
 		const existing =
 			((await this.loadData()) ?? {}) as Record<string, unknown>;
 		await this.saveData({ ...existing, ...this.settings });
+		this.recipeStores.hideCheckedItems.set(this.settings.hideCheckedItems);
 	}
 
 	async saveShoppingList(data: PersistedShoppingList): Promise<void> {

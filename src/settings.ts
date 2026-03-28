@@ -13,6 +13,7 @@ export interface CookbookSettings {
 	shoppingCategories: ShoppingCategory[];
 	preferredVolumeUnit?: string;
 	preferredWeightUnit?: string;
+	hideCheckedItems: boolean;
 }
 
 export const DEFAULT_SETTINGS: CookbookSettings = {
@@ -21,6 +22,7 @@ export const DEFAULT_SETTINGS: CookbookSettings = {
 	recipesTag: "#recipe",
 	cookSoonProp: "cook-soon",
 	ignorePaths: [],
+	hideCheckedItems: false,
 	shoppingCategories: [
 		{
 			name: "Produce",
@@ -487,6 +489,18 @@ export class CookbookSettingTab extends PluginSettingTab {
 					void this.plugin.saveSettings();
 				});
 			});
+
+		new Setting(containerEl)
+			.setName("Hide checked items")
+			.setDesc("When enabled, items disappear from the shopping list as soon as they are checked off.")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.hideCheckedItems)
+					.onChange((value) => {
+						this.plugin.settings.hideCheckedItems = value;
+						void this.plugin.saveSettings();
+					}),
+			);
 
 		new Setting(containerEl)
 			.setName("Shopping list categories")

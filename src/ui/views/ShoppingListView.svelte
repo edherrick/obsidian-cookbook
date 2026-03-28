@@ -3,7 +3,7 @@
 	import { obsidianIcon } from "../../utils/obsidianIcon";
 	import type { RecipeStores } from "../../utils/recipeStores";
 	import type { PersistedShoppingList, ShoppingItem, ShoppingCategory } from "../../types";
-	import { assignCategory } from "../../utils/recipeUtils";
+	import { assignCategory, formatQty } from "../../utils/recipeUtils";
 
 	const { stores, saveShoppingList, shoppingCategories } = $props<{
 		stores: RecipeStores;
@@ -35,8 +35,16 @@
 	const unsubscribe = stores.shoppingList.subscribe(applyList);
 	onDestroy(() => unsubscribe());
 
+	// svelte-ignore state_referenced_locally — stores is a stable reference
+	const hideCheckedItems = stores.hideCheckedItems;
+
 	// ─── Grouped recipe items ─────────────────────────────────────────────────
-	let groups = $derived(buildGroups([...recipeItems, ...customItems], categoryOrder));
+	let visibleItems = $derived(
+		$hideCheckedItems
+			? [...recipeItems, ...customItems].filter((i) => !i.checked)
+			: [...recipeItems, ...customItems]
+	);
+	let groups = $derived(buildGroups(visibleItems, categoryOrder));
 
 	function buildGroups(
 		items: ShoppingItem[],
@@ -273,7 +281,7 @@
 								/>
 								<span class="item-content">
 									<span class="item-text">
-										{#if item.quantity !== null}{item.quantity}&nbsp;{/if}{#if item.unit}{item.unit}&nbsp;{/if}{item.text}
+										{#if item.quantity !== null}{formatQty(item.quantity)}&nbsp;{/if}{#if item.unit}{item.unit}&nbsp;{/if}{item.text}
 									</span>
 									{#if item.recipeTitle}
 										<span class="item-source">{item.recipeTitle}</span>

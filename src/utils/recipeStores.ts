@@ -7,9 +7,10 @@ export interface RecipeStores {
 	recipes: Writable<Recipe[]>;
 	selectedRecipes: Readable<Recipe[]>;
 	shoppingList: Writable<PersistedShoppingList | null>;
+	hideCheckedItems: Writable<boolean>;
 }
 
-export function createRecipeStores(): RecipeStores {
+export function createRecipeStores(hideCheckedItems = false): RecipeStores {
 	const recipes = writable<Recipe[]>([]);
 
 	const selectedRecipes = derived(recipes, ($r) =>
@@ -18,5 +19,5 @@ export function createRecipeStores(): RecipeStores {
 
 	const shoppingList = writable<PersistedShoppingList | null>(null);
 
-	return { recipes, selectedRecipes, shoppingList };
+	return { recipes, selectedRecipes, shoppingList, hideCheckedItems: writable(hideCheckedItems) };
 }

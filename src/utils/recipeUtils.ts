@@ -155,6 +155,41 @@ function roundQty(n: number): number {
 	return Math.round(n * 100) / 100;
 }
 
+// Common cooking fractions as [numerator, denominator] pairs, ordered by denominator
+const COOKING_FRACTIONS: [number, number][] = [
+	[1, 8], [1, 4], [1, 3], [3, 8], [1, 2], [5, 8], [2, 3], [3, 4], [7, 8],
+];
+
+/**
+ * Format a numeric quantity as a human-readable cooking fraction.
+ * e.g. 1.5 → "1 1/2", 0.25 → "1/4", 2 → "2"
+ */
+export function formatQty(n: number): string {
+	if (n <= 0) return String(n);
+	const whole = Math.floor(n);
+	const frac = n - whole;
+
+	if (frac < 0.01) return String(whole);
+	if (frac > 0.99) return String(whole + 1);
+
+	// Snap to nearest common cooking fraction
+	let bestNum = 1, bestDen = 2, bestDist = Infinity;
+	for (const [num, den] of COOKING_FRACTIONS) {
+		const dist = Math.abs(frac - num / den);
+		if (dist < bestDist) {
+			bestDist = dist;
+			bestNum = num;
+			bestDen = den;
+		}
+	}
+
+	// Snapped to 1 whole
+	if (bestNum === bestDen) return String(whole + 1);
+
+	const fracStr = `${bestNum}/${bestDen}`;
+	return whole > 0 ? `${whole} ${fracStr}` : fracStr;
+}
+
 // ─── Ingredient parsing ───────────────────────────────────────────────────────
 
 interface ParsedIngredient {
