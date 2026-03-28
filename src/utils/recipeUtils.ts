@@ -356,7 +356,7 @@ export async function buildShoppingList(
  * - Incompatible units (volume vs weight): kept as separate entries.
  * - Items without units: aggregated by name only (existing behaviour).
  */
-function aggregateItems(items: ShoppingItem[], prefs?: DisplayUnitPrefs): ShoppingItem[] {
+export function aggregateItems(items: ShoppingItem[], prefs?: DisplayUnitPrefs): ShoppingItem[] {
 	const map = new Map<string, ShoppingItem>();
 	for (const item of items) {
 		const nameKey = item.text.toLowerCase().replace(/\s+/g, " ").trim();
