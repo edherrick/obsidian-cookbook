@@ -235,6 +235,7 @@ export interface ParsedIngredient {
 	quantity: number | null;
 	unit: string | null;
 	text: string;
+	prep?: string;
 }
 
 /**
@@ -244,8 +245,13 @@ export interface ParsedIngredient {
  * Unit is only extracted if it matches a known cooking unit.
  */
 export function parseIngredient(raw: string): ParsedIngredient {
+	// Split on | to separate ingredient from prep instructions (e.g. "2 cups flour | sifted")
+	const pipeIdx = raw.indexOf("|");
+	const prep = pipeIdx !== -1 ? raw.slice(pipeIdx + 1).trim() || undefined : undefined;
+	const ingredientPart = pipeIdx !== -1 ? raw.slice(0, pipeIdx) : raw;
+
 	// Strip leading approximate marker
-	let s = raw.replace(/^~\s*/, "").trim();
+	let s = ingredientPart.replace(/^~\s*/, "").trim();
 
 	let quantity: number | null = null;
 	let rest = s;
@@ -274,7 +280,7 @@ export function parseIngredient(raw: string): ParsedIngredient {
 		rest = s.slice(qm[0].length);
 	}
 
-	if (quantity === null) return { quantity: null, unit: null, text: s };
+	if (quantity === null) return { quantity: null, unit: null, text: s, prep };
 
 	// Try to match a known unit at the start of rest (two-word first, then one-word)
 	const words = rest.trim().split(/\s+/);
@@ -297,7 +303,7 @@ export function parseIngredient(raw: string): ParsedIngredient {
 	}
 
 	const text = (textWords.length > 0 ? textWords.join(" ") : rest).trim();
-	return { quantity, unit, text: text || rest.trim() };
+	return { quantity, unit, text: text || rest.trim(), prep };
 }
 
 export interface DisplayUnitPrefs {
@@ -361,6 +367,7 @@ export async function buildShoppingList(
 					category: assignCategory(parsed.text, categories),
 					source: "recipe" as const,
 					recipeTitle: recipe.title,
+					prep: parsed.prep,
 				}));
 			} catch (e) {
 				console.error("buildShoppingList: failed reading", recipe.path, e);
@@ -420,6 +427,11 @@ export function aggregateItems(items: ShoppingItem[], prefs?: DisplayUnitPrefs):
 				existing.recipeTitle = existing.recipeTitle
 					? `${existing.recipeTitle}, ${item.recipeTitle}`
 					: item.recipeTitle;
+			}
+			if (item.prep && item.prep !== existing.prep) {
+				existing.prep = existing.prep
+					? `${existing.prep} | ${item.prep}`
+					: item.prep;
 			}
 		} else {
 			map.set(key, { ...item });

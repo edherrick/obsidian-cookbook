@@ -283,6 +283,9 @@
 									<span class="item-text">
 										{#if item.quantity !== null}{formatQty(item.quantity)}&nbsp;{/if}{#if item.unit}{item.unit}&nbsp;{/if}{item.text}
 									</span>
+									{#if item.prep}
+										<span class="item-prep">{item.prep}</span>
+									{/if}
 									{#if item.recipeTitle}
 										<span class="item-source">{item.recipeTitle}</span>
 									{/if}
@@ -504,6 +507,11 @@
 
 	li.checked .item-text {
 		text-decoration: line-through;
+		color: var(--text-muted);
+	}
+
+	.item-prep {
+		font-size: 0.78em;
 		color: var(--text-muted);
 	}
 

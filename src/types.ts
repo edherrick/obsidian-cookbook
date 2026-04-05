@@ -7,6 +7,7 @@ export interface ShoppingItem {
 	category: string;
 	source: "recipe" | "custom";
 	recipeTitle?: string;
+	prep?: string;
 }
 
 export interface PersistedShoppingList {
