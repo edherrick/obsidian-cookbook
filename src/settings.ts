@@ -16,10 +16,12 @@ export interface CookbookSettings {
 	preferredWeightUnit?: string;
 	hideCheckedItems: boolean;
 	ingredientGroups: IngredientGroup[];
+	shoppingListFilePath?: string;
 }
 
 export const DEFAULT_SETTINGS: CookbookSettings = {
 	propsToShow: ["title"],
+	shoppingListFilePath: undefined,
 	coverProp: "cover",
 	recipesFolder: ".",
 	recipesTag: "#recipe",
@@ -610,6 +612,24 @@ export class CookbookSettingTab extends PluginSettingTab {
 						void this.plugin.saveSettings();
 					}),
 			);
+
+		new Setting(containerEl)
+			.setName("Shopping list vault file")
+			.setDesc(
+				// eslint-disable-next-line obsidianmd/ui/sentence-case
+				"If set, the shopping list is saved to this markdown file in your vault instead of plugin storage. Leave empty to use internal storage.",
+			)
+			.addSearch((search) => {
+				new FileFolderSuggester(this.app, search.inputEl);
+				search
+					// eslint-disable-next-line obsidianmd/ui/sentence-case
+					.setPlaceholder("e.g. shopping-list.md")
+					.setValue(this.plugin.settings.shoppingListFilePath ?? "")
+					.onChange((value) => {
+						this.plugin.settings.shoppingListFilePath = value.trim() || undefined;
+						void this.plugin.saveSettings();
+					});
+			});
 
 		new Setting(containerEl)
 			.setName("Ingredient groups")

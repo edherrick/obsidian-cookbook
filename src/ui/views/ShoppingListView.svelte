@@ -227,9 +227,21 @@
 		{/if}
 	</div>
 
+	<!-- Add custom item -->
+	<div class="add-row">
+		<label class="sr-only" for="shopping-add-input">Add item to list</label>
+		<input
+			id="shopping-add-input"
+			bind:value={newItemText}
+			placeholder="Add item (e.g. toothpaste)"
+			onkeydown={(e) => e.key === "Enter" && addCustomItem()}
+		/>
+		<button onclick={addCustomItem}>Add</button>
+	</div>
+
 	{#if totalItems === 0}
-		<p class="empty-state">
-			No items yet.<br />Mark recipes as "cook soon" and click <strong
+		<p class="no-items-msg">
+			No items yet. Add something above, or mark recipes as "cook soon" and click <strong
 				>Generate Shopping List</strong
 			> from the ribbon icon.
 		</p>
@@ -302,20 +314,7 @@
 				</ul>
 			</div>
 		{/each}
-
 	{/if}
-
-	<!-- Add custom item -->
-	<div class="add-row">
-		<label class="sr-only" for="shopping-add-input">Add item to list</label>
-		<input
-			id="shopping-add-input"
-			bind:value={newItemText}
-			placeholder="Add item (e.g. toothpaste)"
-			onkeydown={(e) => e.key === "Enter" && addCustomItem()}
-		/>
-		<button onclick={addCustomItem}>Add</button>
-	</div>
 </div>
 
 <style>
@@ -371,7 +370,7 @@
 		border-color: var(--text-error);
 	}
 
-	.empty-state {
+	.no-items-msg {
 		color: var(--text-muted);
 		font-size: 0.9em;
 		text-align: center;
@@ -563,9 +562,8 @@
 	.add-row {
 		display: flex;
 		gap: 6px;
-		padding-top: 0.5rem;
-		border-top: 1px solid var(--background-modifier-border);
-		margin-top: auto;
+		padding-bottom: 0.5rem;
+		border-bottom: 1px solid var(--background-modifier-border);
 	}
 
 	.add-row input {
