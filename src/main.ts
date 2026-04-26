@@ -137,7 +137,9 @@ export default class CookbookPlugin extends Plugin {
 		this.addSettingTab(new CookbookSettingTab(this.app, this));
 	}
 
-	onunload() {}
+	onunload() {
+		this.app.workspace.detachLeavesOfType(VIEW_TYPE_SHOPPING);
+	}
 
 	async openShoppingListView(): Promise<void> {
 		const existing =
