@@ -39,11 +39,8 @@
 	const hideCheckedItems = stores.hideCheckedItems;
 
 	// ─── Grouped recipe items ─────────────────────────────────────────────────
-	let visibleItems = $derived(
-		$hideCheckedItems
-			? [...recipeItems, ...customItems].filter((i) => !i.checked)
-			: [...recipeItems, ...customItems]
-	);
+	let allItems = $derived([...recipeItems, ...customItems]);
+	let visibleItems = $derived($hideCheckedItems ? allItems.filter((i) => !i.checked) : allItems);
 	let groups = $derived(buildGroups(visibleItems, categoryOrder));
 
 	function buildGroups(
@@ -74,17 +71,19 @@
 	// ─── Persistence ─────────────────────────────────────────────────────────
 	async function persist() {
 		await saveShoppingList({
-			items: [...recipeItems, ...customItems],
+			items: allItems,
 			categoryOrder,
 			generatedAt: generatedAt ?? Date.now(),
 		});
 	}
 
-	// ─── Recipe item toggle ───────────────────────────────────────────────────
-	async function toggleRecipeItem(id: string) {
-		recipeItems = recipeItems.map((i) =>
-			i.id === id ? { ...i, checked: !i.checked } : i,
-		);
+	// ─── Item toggle ─────────────────────────────────────────────────────────
+	async function toggleItem(item: ShoppingItem) {
+		if (item.source === "custom") {
+			customItems = customItems.map((i) => i.id === item.id ? { ...i, checked: !i.checked } : i);
+		} else {
+			recipeItems = recipeItems.map((i) => i.id === item.id ? { ...i, checked: !i.checked } : i);
+		}
 		await persist();
 	}
 
@@ -105,13 +104,6 @@
 			},
 		];
 		newItemText = "";
-		await persist();
-	}
-
-	async function toggleCustomItem(id: string) {
-		customItems = customItems.map((i) =>
-			i.id === id ? { ...i, checked: !i.checked } : i,
-		);
 		await persist();
 	}
 
@@ -174,11 +166,8 @@
 	}
 
 	// ─── Stats ────────────────────────────────────────────────────────────────
-	let totalItems = $derived(recipeItems.length + customItems.length);
-	let checkedCount = $derived(
-		recipeItems.filter((i) => i.checked).length +
-			customItems.filter((i) => i.checked).length,
-	);
+	let totalItems = $derived(allItems.length);
+	let checkedCount = $derived(allItems.filter((i) => i.checked).length);
 
 	let resetPending = $state(false);
 	let resetTimer: ReturnType<typeof setTimeout> | null = null;
@@ -289,7 +278,7 @@
 								<input
 									type="checkbox"
 									checked={item.checked}
-									onchange={() => item.source === "custom" ? toggleCustomItem(item.id) : toggleRecipeItem(item.id)}
+									onchange={() => toggleItem(item)}
 								/>
 								<span class="item-content">
 									<span class="item-text">

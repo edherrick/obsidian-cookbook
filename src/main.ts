@@ -205,7 +205,7 @@ export default class CookbookPlugin extends Plugin {
 		await this.app.vault.adapter.mkdir(dir);
 	}
 
-	private getItemsInDisplayOrder(data: PersistedShoppingList): ShoppingItem[] {
+	private static getItemsInDisplayOrder(data: PersistedShoppingList): ShoppingItem[] {
 		const byCategory = new Map<string, ShoppingItem[]>();
 		for (const item of data.items) {
 			const cat = item.category || "Uncategorized";
@@ -227,7 +227,7 @@ export default class CookbookPlugin extends Plugin {
 			lines.push(`_Generated: ${new Date(data.generatedAt).toLocaleString()}_`);
 		}
 
-		const ordered = this.getItemsInDisplayOrder(data);
+		const ordered = CookbookPlugin.getItemsInDisplayOrder(data);
 		let currentCat = "";
 		for (const item of ordered) {
 			const cat = item.category || "Uncategorized";
@@ -266,7 +266,7 @@ export default class CookbookPlugin extends Plugin {
 		const checkboxStates = body.split("\n")
 			.filter((line) => /^- \[[ x]\] /.test(line))
 			.map((line) => line[3] === "x");
-		const orderedItems = this.getItemsInDisplayOrder(data);
+		const orderedItems = CookbookPlugin.getItemsInDisplayOrder(data);
 		if (checkboxStates.length === orderedItems.length) {
 			orderedItems.forEach((item, i) => { item.checked = checkboxStates[i]!; });
 		}
