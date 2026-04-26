@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-cookbook",
-	"version": "1.0.0",
+	"version": "1.2.0",
 	"description": "An Obsidian plugin to browse recipe notes, filter by frontmatter properties, and generate categorised shopping lists.",
 	"main": "main.js",
 	"type": "module",
