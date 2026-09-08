@@ -2,8 +2,9 @@
 	import { onMount, onDestroy } from "svelte";
 	import { MarkdownRenderer, Component } from "obsidian";
 	import type { App } from "obsidian";
-	import type { Recipe } from "../../utils/recipeUtils";
+	import type { Recipe } from "../../recipes/repository";
 	import MultiplierControl from "../components/MultiplierControl.svelte";
+	import { resolveCoverSrc } from "../../utils/coverImage";
 
 	const { recipe, app, close, onToggleCookSoon, onSetMultiplier, cookSoonProp = "cook-soon", coverProp = "cover" } = $props<{
 		recipe: Recipe;
@@ -26,6 +27,9 @@
 		"cook_soon",
 		cookSoonProp,
 	]);
+
+	// svelte-ignore state_referenced_locally — recipe is stable for this modal
+	const coverSrc = resolveCoverSrc(app, recipe[coverProp], recipe.path);
 
 	let contentEl: HTMLDivElement;
 	let loading = $state(true);
@@ -92,8 +96,8 @@
 
 <div class="recipe-detail">
 	<!-- Cover -->
-	{#if recipe[coverProp]}
-		<img class="cover" src={recipe[coverProp]} alt={recipe.title} loading="lazy" />
+	{#if coverSrc}
+		<img class="cover" src={coverSrc} alt={recipe.title} loading="lazy" />
 	{/if}
 
 	<!-- Header -->

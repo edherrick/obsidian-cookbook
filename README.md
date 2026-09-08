@@ -53,16 +53,45 @@ Both unchecked `[ ]` and already-checked `[x]` boxes are picked up — the check
 The plugin parses quantities and units from the start of each ingredient line. Supported formats:
 
 ```text
-- [ ] 2 cups flour            →  2 cups flour
-- [ ] 1/2 tsp salt            →  1/2 tsp salt
-- [ ] 1 1/2 cups milk         →  1 1/2 cups milk
-- [ ] 100g butter             →  100 g butter
-- [ ] 2-3 cloves garlic       →  2 cloves garlic  (takes lower of range)
-- [ ] ~6 cups broccoli        →  6 cups broccoli  (strips ~ marker)
-- [ ] olive oil               →  olive oil        (no quantity)
+- [ ] 2 cups flour              →  2 cups flour
+- [ ] 1/2 tsp salt              →  1/2 tsp salt
+- [ ] 1 1/2 cups milk           →  1 1/2 cups milk
+- [ ] 100g butter               →  100 g butter
+- [ ] 6 Tbsp. butter            →  6 tbsp butter    (abbreviation period ignored)
+- [ ] 2-3 cloves garlic         →  2 cloves garlic  (takes lower of range)
+- [ ] 1 1/2 - 2 cups basil      →  1 1/2 cups basil (ranges of fractions too)
+- [ ] 4 garlic cloves           →  4 cloves garlic  (trailing count unit)
+- [ ] 1 (14-ounce) can milk     →  1 can milk       (size aside ignored)
+- [ ] ~6 cups broccoli          →  6 cups broccoli  (strips ~ marker)
+- [ ] olive oil                 →  olive oil        (no quantity)
 ```
 
-Recognised units include: `tsp`, `tbsp`, `cup/cups`, `pt`, `qt`, `gal`, `ml`, `l`, `fl oz` (volume) and `g`, `kg`, `oz`, `lb/lbs` (weight).
+Recognised units:
+
+| Kind | Units |
+| --- | --- |
+| Volume | `tsp`, `tbsp`, `cup/cups`, `pt`, `qt`, `gal`, `ml`, `l`, `fl oz` |
+| Weight | `g`, `kg`, `oz`, `lb/lbs` |
+| Count | `clove`, `can`, `tin`, `jar`, `stick`, `bunch`, `slice`, `piece`, `package`, `pinch`, `dash`, `head`, `sprig`, `stalk`, `sheet` |
+
+Volume and weight units convert into each other within their kind. Count units never convert — they only add up when the unit is the same, so `2 cloves` and `1 head` of garlic stay as separate lines.
+
+#### Preparation notes
+
+Anything after a `|` is treated as a preparation note rather than part of the ingredient name:
+
+```text
+- [ ] 1 large red onion | cut into 1-inch strips
+```
+
+A trailing comma clause is also read as preparation when it begins with a preparation word (`chopped`, `divided`, `rinsed`, `to taste`, `optional`, …):
+
+```text
+- [ ] 4 garlic cloves, chopped        →  4 cloves garlic     + note "chopped"
+- [ ] 7-8 Tbsp soy sauce, to taste    →  7 tbsp soy sauce    + note "to taste"
+```
+
+Commas that are simply part of the name are left alone — `1 1/2 lbs boneless, skinless chicken breasts` keeps its full name.
 
 #### Serving multiplier
 
@@ -77,6 +106,14 @@ When you generate a shopping list from multiple cook-soon recipes, identical ing
 - **Incompatible units** (e.g. cups vs grams) — kept as separate entries
 - **No unit** — aggregated by name only
 - The source recipe titles are **combined** and shown as a label under the item so you know where it came from
+
+Names are compared after stripping wikilinks, parentheticals and leading descriptors, so `shredded cheddar cheese` and `cheddar cheese` become one line. The wording of whichever line came first is what you see.
+
+#### Categorising items
+
+Each ingredient goes to the category with the **most specific matching keyword**, not simply the first category that matches. Keywords match whole words only.
+
+That combination is what keeps `full-fat coconut milk` in **Pantry** (the 12-character `coconut milk` beats Dairy's `milk`) and `horseradish cheddar cheese` in **Dairy & Eggs** (Produce's `radish` no longer matches inside `horseradish`).
 
 Items that cannot be matched to a category fall into **Uncategorized** at the bottom of the list.
 
@@ -147,6 +184,10 @@ The tag that identifies a note as a recipe. Defaults to `#recipe`.
 
 The frontmatter key used to mark a recipe as cook-soon. Defaults to `cook-soon`. Change this if your vault already uses a different key.
 
+### Cover image property
+
+The frontmatter key holding each recipe's cover image. Defaults to `cover`. The value can be a URL, a vault-relative path, a wikilink (`[[cover.png]]`) or a markdown image — all of them resolve to the right picture on the recipe card and in the detail view.
+
 ### Ignore paths
 
 A list of folders or files to exclude from recipe scanning. Useful for template folders or example notes.
@@ -161,7 +202,7 @@ Choose which unit to use when displaying aggregated volume or weight quantities 
 
 ### Ingredient groups
 
-Named groups of ingredient keywords used by the dietary group filters in the recipe browser. Six groups are pre-configured (Dairy, Meat & Poultry, Fish & Seafood, Eggs, Nuts, Gluten). You can add your own groups, edit the keywords, or remove groups you don't need.
+Named groups of ingredient keywords used by the dietary group filters in the recipe browser. Six groups are pre-configured (Dairy, Meat & Poultry, Fish & Seafood, Eggs, Nuts, Gluten). You can add your own groups, edit the keywords, or remove groups you don't need. **Restore defaults** puts the shipped groups back, which is also how you pick up keyword improvements from a plugin update.
 
 ### Shopping list categories
 
@@ -169,7 +210,11 @@ Keyword-based categories that group items on the shopping list. When a list is g
 
 Default categories: Produce, Dairy & Eggs, Meat & Fish, Pantry, Frozen, Bakery.
 
-You can add, remove, reorder, and edit categories and their keywords from the settings tab.
+You can add, remove, reorder, and edit categories and their keywords from the settings tab, and **Restore defaults** puts the shipped set back.
+
+Keywords match whole words, so `pea` will not match `peanut butter`. Compound names need their own keyword — the defaults list `blueberries` separately from `berries` for exactly this reason.
+
+The order you arrange categories into on the shopping list itself is yours: it is remembered and survives regenerating the list.
 
 ## Installation
 

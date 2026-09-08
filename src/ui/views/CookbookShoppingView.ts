@@ -1,7 +1,7 @@
 import { ItemView, WorkspaceLeaf } from "obsidian";
 import { mount, unmount } from "svelte";
 import ShoppingListView from "./ShoppingListView.svelte";
-import type { RecipeStores } from "../../utils/recipeStores";
+import type { RecipeStores } from "../../recipes/recipeStores";
 import type { PersistedShoppingList, ShoppingCategory } from "../../types";
 
 export const VIEW_TYPE_SHOPPING = "cookbook-shopping";

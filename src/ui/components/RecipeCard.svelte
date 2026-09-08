@@ -2,6 +2,7 @@
 	import { getContext } from "svelte";
 	import type { App } from "obsidian";
 	import { obsidianIcon } from "../../utils/obsidianIcon";
+	import { resolveCoverSrc } from "../../utils/coverImage";
 	import { SvelteModalWrapper } from "../../utils/SvelteModalWrapper";
 	import RecipeDetailModal from "../modals/RecipeDetailModal.svelte";
 	import MultiplierControl from "./MultiplierControl.svelte";
@@ -24,6 +25,9 @@
 		onSetMultiplier?: (path: string, multiplier: number) => void;
 	}>();
 
+	// Covers may be URLs, vault paths or wikilinks — all need resolving to a src
+	const coverSrc = $derived(resolveCoverSrc(app, recipe[coverProp], recipe.path as string));
+
 	function openDetail() {
 		new SvelteModalWrapper(app, RecipeDetailModal, {
 			recipe,
@@ -39,11 +43,11 @@
 </script>
 
 <div class="recipe-card">
-	{#if recipe[coverProp]}
+	{#if coverSrc}
 		<div class="recipe-cover-wrap">
 			<img
 				class="recipe-cover"
-				src={recipe[coverProp]}
+				src={coverSrc}
 				alt={recipe.title || "No title"}
 				loading="lazy"
 			/>

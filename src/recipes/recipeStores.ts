@@ -1,6 +1,6 @@
 import { writable, derived } from "svelte/store";
 import type { Writable, Readable } from "svelte/store";
-import type { Recipe } from "./recipeUtils";
+import type { Recipe } from "./repository";
 import type { PersistedShoppingList } from "../types";
 
 export interface RecipeStores {

@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { onDestroy } from "svelte";
 	import { obsidianIcon } from "../../utils/obsidianIcon";
-	import type { RecipeStores } from "../../utils/recipeStores";
+	import type { RecipeStores } from "../../recipes/recipeStores";
 	import type { PersistedShoppingList, ShoppingItem, ShoppingCategory } from "../../types";
-	import { assignCategory, formatQty } from "../../utils/recipeUtils";
+	import { assignCategory } from "../../ingredients/categorize";
+	import { formatQty } from "../../ingredients/units";
 
 	const { stores, saveShoppingList, getShoppingCategories } = $props<{
 		stores: RecipeStores;
@@ -88,13 +89,15 @@
 	}
 
 	// ─── Custom items ─────────────────────────────────────────────────────────
+	let customIdCounter = 0;
+
 	async function addCustomItem() {
 		const text = newItemText.trim();
 		if (!text) return;
 		customItems = [
 			...customItems,
 			{
-				id: `custom-${Date.now()}`,
+				id: `custom-${Date.now()}-${customIdCounter++}`,
 				text,
 				quantity: null,
 				unit: null,
@@ -131,22 +134,10 @@
 	async function onDrop(e: DragEvent, target: string) {
 		e.preventDefault();
 		dragOver = null;
-		if (!dragSource || dragSource === target) {
-			dragSource = null;
-			return;
-		}
-		const from = categoryOrder.indexOf(dragSource);
-		const to = categoryOrder.indexOf(target);
-		if (from === -1 || to === -1) {
-			dragSource = null;
-			return;
-		}
-		const newOrder = [...categoryOrder];
-		newOrder.splice(from, 1);
-		newOrder.splice(to, 0, dragSource);
-		categoryOrder = newOrder;
+		const moved = dragSource;
 		dragSource = null;
-		await persist();
+		if (!moved || moved === target) return;
+		await reorderCategory(moved, target);
 	}
 
 	function onDragEnd() {
@@ -154,15 +145,39 @@
 		dragOver = null;
 	}
 
-	// ─── Keyboard category reorder ────────────────────────────────────────────
-	async function moveCategory(category: string, dir: -1 | 1) {
-		const idx = categoryOrder.indexOf(category);
-		const target = idx + dir;
-		if (target < 0 || target >= categoryOrder.length) return;
-		const newOrder = [...categoryOrder];
-		[newOrder[idx], newOrder[target]] = [newOrder[target]!, newOrder[idx]!];
-		categoryOrder = newOrder;
+	// ─── Category reorder ─────────────────────────────────────────────────────
+
+	/**
+	 * Place `moved` where `target` currently sits.
+	 *
+	 * Either category may be missing from categoryOrder — a category can come
+	 * from a renamed setting, or from an item the order list has never seen —
+	 * so both are appended before the move rather than silently doing nothing.
+	 */
+	async function reorderCategory(moved: string, target: string) {
+		const order = [...categoryOrder];
+		for (const c of [moved, target]) if (!order.includes(c)) order.push(c);
+		const from = order.indexOf(moved);
+		const to = order.indexOf(target);
+		if (from === -1 || to === -1 || from === to) return;
+		order.splice(from, 1);
+		order.splice(to, 0, moved);
+		categoryOrder = order;
 		await persist();
+	}
+
+	/**
+	 * Step a category past its neighbour *in the rendered list*.
+	 *
+	 * categoryOrder also holds categories with no items in this list, which are
+	 * not rendered. Stepping through those positions looked like the button was
+	 * doing nothing, so the move is anchored to the visible group instead.
+	 */
+	async function moveCategory(category: string, dir: -1 | 1) {
+		const visible = groups.map((g: { category: string }) => g.category);
+		const neighbour = visible[visible.indexOf(category) + dir];
+		if (neighbour === undefined) return;
+		await reorderCategory(category, neighbour);
 	}
 
 	// ─── Stats ────────────────────────────────────────────────────────────────

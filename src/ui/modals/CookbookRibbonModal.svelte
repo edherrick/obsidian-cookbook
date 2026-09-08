@@ -2,33 +2,34 @@
 	import { obsidianIcon } from "../../utils/obsidianIcon";
 	import { onMount } from "svelte";
 	import MultiplierControl from "../components/MultiplierControl.svelte";
-	import { getRecipes, applyToggleCookSoon, applySetMultiplier } from "../../utils/recipeUtils";
-	import type { Recipe } from "../../utils/recipeUtils";
+	import { applyToggleCookSoon, applySetMultiplier } from "../../recipes/repository";
+	import type { Recipe } from "../../recipes/repository";
 
-	const { openRecipeModal, generateShoppingList, stores, app, close, cookSoonProp = "cook-soon", ignorePaths = [], recipesFolder, recipesTag = "#recipe" } =
-		$props<{
-			openRecipeModal: () => void;
-			generateShoppingList: () => Promise<void>;
-			stores: import("../../utils/recipeStores").RecipeStores;
-			app: import("obsidian").App;
-			close: () => void;
-			cookSoonProp?: string;
-			ignorePaths?: string[];
-			recipesFolder?: string;
-			recipesTag?: string;
-		}>();
+	const {
+		openRecipeModal,
+		generateShoppingList,
+		refreshRecipes,
+		stores,
+		app,
+		close,
+		cookSoonProp = "cook-soon",
+	} = $props<{
+		openRecipeModal: () => void;
+		generateShoppingList: () => Promise<void>;
+		refreshRecipes: () => Promise<void>;
+		stores: import("../../recipes/recipeStores").RecipeStores;
+		app: import("obsidian").App;
+		close: () => void;
+		cookSoonProp?: string;
+	}>();
 
 	// svelte-ignore state_referenced_locally — stores is a stable reference
 	const { selectedRecipes } = stores;
 
 	let generating = $state(false);
 
-	onMount(async () => {
-		const fresh = await getRecipes(app, cookSoonProp, ignorePaths, recipesFolder, recipesTag);
-		stores.recipes.update((current: Recipe[]) => {
-			const multiplierMap = new Map(current.map((r) => [r.path, r.cook_multiplier]));
-			return fresh.map((r) => ({ ...r, cook_multiplier: multiplierMap.get(r.path) ?? 1 }));
-		});
+	onMount(() => {
+		void refreshRecipes();
 	});
 
 	function toggleCookSoon(path: string) {
