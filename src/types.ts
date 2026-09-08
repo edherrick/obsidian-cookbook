@@ -16,9 +16,19 @@ export interface PersistedShoppingList {
 	generatedAt: number;
 }
 
-export interface ShoppingCategory {
+/**
+ * A named list of keywords matched against ingredient text.
+ *
+ * Two different things in this plugin share that shape. They are kept as
+ * separate names because they answer different questions and may yet diverge.
+ */
+export interface KeywordGroup {
 	name: string;
 	keywords: string[];
 }
 
-export type IngredientGroup = { name: string; keywords: string[] };
+/** A shopping-list aisle. Every item lands in exactly one, chosen in list order. */
+export type ShoppingCategory = KeywordGroup;
+
+/** A dietary group for filtering recipes. A recipe may match several at once. */
+export type IngredientGroup = KeywordGroup;

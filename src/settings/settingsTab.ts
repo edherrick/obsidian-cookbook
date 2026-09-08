@@ -1,7 +1,7 @@
 import { App, PluginSettingTab, Setting, debounce, setIcon } from "obsidian";
 import type CookbookPlugin from "../main";
 import { PathSuggest } from "../utils/suggesters/PathSuggest";
-import type { ShoppingCategory } from "../types";
+import type { KeywordGroup } from "../types";
 import { cloneDefaultSettings } from "./index";
 
 /** Keystrokes shouldn't each cost a disk read + write. */
@@ -17,9 +17,10 @@ export class CookbookSettingTab extends PluginSettingTab {
 		this.saveDebounced = debounce(() => void this.plugin.saveSettings(), SAVE_DEBOUNCE_MS, false);
 	}
 
+	/** Edits any named keyword list — shopping categories and ingredient groups alike. */
 	private renderCategoryEditor(
 		container: HTMLElement,
-		getItems: () => ShoppingCategory[],
+		getItems: () => KeywordGroup[],
 		options: { namePlaceholder: string; addLabel: string; reorderable?: boolean },
 	): void {
 		container.empty();
