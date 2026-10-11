@@ -22,6 +22,8 @@ note: "#prep/ignored in frontmatter"
 \`\`\`
 
 Then #prep/sautee the onion.
+
+Write \`#prep/technique\` after the pipe.
 `;
 
 describe("checkRecipeContent", () => {
@@ -40,7 +42,8 @@ describe("checkRecipeContent", () => {
 		]);
 	});
 
-	it("skips frontmatter and code blocks", () => {
+	it("skips frontmatter, code blocks and inline code", () => {
+		expect(issues.some((i) => i.text.includes("after the pipe"))).toBe(false);
 		expect(issues.some((i) => i.text.includes("ignored"))).toBe(false);
 		expect(issues.some((i) => i.text.includes("carrot"))).toBe(false);
 	});

@@ -43,7 +43,9 @@ export function checkRecipeContent(content: string, vocab: Vocabulary): Vocabula
 		}
 		if (inFence) continue;
 
-		const unknown = [...line.matchAll(tagRe)]
+		// Obsidian doesn't read tags inside inline code, so neither does the check
+		const prose = line.replace(/`[^`]*`/g, " ");
+		const unknown = [...prose.matchAll(tagRe)]
 			.map((m) => m[1]!.toLowerCase())
 			.filter((t) => !known.has(t));
 		if (unknown.length > 0) {
