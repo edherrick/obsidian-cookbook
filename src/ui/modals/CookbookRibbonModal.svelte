@@ -150,7 +150,7 @@
 
 		{#if $cookTogetherRecipes && $cookTogetherRecipes.length > 0}
 			<button class="btn" onclick={handleStartSession} disabled={startingSession}>
-				<span use:obsidianIcon={"chef-hat"} class="btn-icon"></span>
+				<span use:obsidianIcon={"cooking-pot"} class="btn-icon"></span>
 				<span class="btn-label">{startingSession ? "Writing…" : "Start Cooking Session"}</span>
 			</button>
 		{/if}

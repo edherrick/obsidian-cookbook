@@ -105,6 +105,19 @@ export function keptNotes(existing: string | undefined): string {
 	return idx === -1 ? `${MY_NOTES_HEADING}\n` : existing.slice(idx);
 }
 
+// ─── Recipe colors ──────────────────────────────────────────────────────────
+
+/** Plain emoji, so the colors show in every view and on mobile with no CSS. */
+const RECIPE_DOTS = ["🔴", "🟠", "🟡", "🟢", "🔵", "🟣", "🟤", "⚫", "⚪"];
+
+/**
+ * One colored dot per recipe, assigned in cook order so the key at the top
+ * reads in rainbow order. Past nine recipes the colors repeat.
+ */
+export function recipeDots(recipes: SessionRecipe[]): Map<string, string> {
+	return new Map(cookOrder(recipes).map((r, i) => [r.path, RECIPE_DOTS[i % RECIPE_DOTS.length]!]));
+}
+
 // ─── Prep list ──────────────────────────────────────────────────────────────
 
 interface PrepEntry {
@@ -140,7 +153,7 @@ function amount(item: Pick<ShoppingItem, "quantity" | "unit">): string {
 	return item.unit ? `${formatQty(item.quantity)} ${item.unit}` : formatQty(item.quantity);
 }
 
-function prepLine(entries: PrepEntry[], opts: SessionOptions): string {
+function prepLine(entries: PrepEntry[], opts: SessionOptions, dots: Map<string, string>): string {
 	const keyOf = (t: string) => opts.vocab.ingredientKey(t);
 	const totals = aggregateItems(
 		entries.map((e) => e.item),
@@ -155,7 +168,12 @@ function prepLine(entries: PrepEntry[], opts: SessionOptions): string {
 	// A recipe that uses the ingredient in two steps is still one source
 	const byRecipe = new Map<string, PrepEntry[]>();
 	for (const e of entries) byRecipe.set(e.recipe.path, [...(byRecipe.get(e.recipe.path) ?? []), e]);
-	const sources = [...byRecipe.values()].map((group) => {
+	// In key order, so the dots read the same way on every line
+	const rank = [...dots.keys()];
+	const groups = [...byRecipe.values()].sort(
+		(x, y) => rank.indexOf(x[0]!.recipe.path) - rank.indexOf(y[0]!.recipe.path),
+	);
+	const sources = groups.map((group) => {
 		const a = aggregateItems(
 			group.map((e) => e.item),
 			opts.unitPrefs,
@@ -164,16 +182,19 @@ function prepLine(entries: PrepEntry[], opts: SessionOptions): string {
 			.map(amount)
 			.filter(Boolean)
 			.join(" + ");
-		return a ? `${group[0]!.recipe.title} (${a})` : group[0]!.recipe.title;
+		return { dot: dots.get(group[0]!.recipe.path) ?? "", amount: a };
 	});
 
 	const name = tidy(entries[0]!.item.text) || entries[0]!.item.text;
 	const head = [`**${name}**`, totals.join(" + "), details.join("; ")]
 		.filter(Boolean)
 		.join(" · ");
-	// One source needs no breakdown when it is the whole total
-	const tail = byRecipe.size > 1 ? sources.join(", ") : entries[0]!.recipe.title;
-	return `- [ ] ${head} — _${tail}_`;
+	// One source needs no amount when it is the whole total
+	const tail =
+		sources.length > 1
+			? sources.map((x) => (x.amount ? `${x.dot} ${x.amount}` : x.dot)).join(", ")
+			: sources[0]!.dot;
+	return `- [ ] ${head} — ${tail}`;
 }
 
 function groupByIngredient(entries: PrepEntry[], vocab: Vocabulary): PrepEntry[][] {
@@ -193,6 +214,7 @@ function groupByIngredient(entries: PrepEntry[], vocab: Vocabulary): PrepEntry[]
  * diced appears under both — those are two passes over the board.
  */
 export function buildPrepList(recipes: SessionRecipe[], opts: SessionOptions): string {
+	const dots = recipeDots(recipes);
 	const byTechnique = new Map<string, PrepEntry[]>();
 	const other: PrepEntry[] = [];
 
@@ -218,11 +240,11 @@ export function buildPrepList(recipes: SessionRecipe[], opts: SessionOptions): s
 		const entries = byTechnique.get(t);
 		if (!entries) continue;
 		const title = t.charAt(0).toUpperCase() + t.slice(1);
-		const lines = groupByIngredient(entries, opts.vocab).map((g) => prepLine(g, opts));
+		const lines = groupByIngredient(entries, opts.vocab).map((g) => prepLine(g, opts, dots));
 		sections.push(`### ${title} ${opts.vocab.tagFor(t)}\n${lines.join("\n")}`);
 	}
 	if (other.length > 0) {
-		const lines = groupByIngredient(other, opts.vocab).map((g) => prepLine(g, opts));
+		const lines = groupByIngredient(other, opts.vocab).map((g) => prepLine(g, opts, dots));
 		sections.push(`### Other prep\n${lines.join("\n")}`);
 	}
 	return sections.length > 0 ? sections.join("\n\n") : "_Nothing to prep ahead._";
@@ -277,6 +299,8 @@ function yamlString(s: string): string {
 export function buildSessionNote(recipes: SessionRecipe[], opts: SessionOptions): string {
 	const link = opts.linkTo ?? defaultLink;
 	const ordered = cookOrder(recipes);
+	const dots = recipeDots(recipes);
+	const dot = (r: SessionRecipe) => dots.get(r.path) ?? "";
 
 	const frontmatter = [
 		"---",
@@ -291,7 +315,7 @@ export function buildSessionNote(recipes: SessionRecipe[], opts: SessionOptions)
 	const recipeList = ordered
 		.map((r) => {
 			const meta = [timing(r), storage(r)].filter(Boolean).join(" · ");
-			return `- ${link(r)}${meta ? ` — ${meta}` : ""}`;
+			return `- ${dot(r)} ${link(r)}${meta ? ` — ${meta}` : ""}`;
 		})
 		.join("\n");
 
@@ -316,7 +340,7 @@ export function buildSessionNote(recipes: SessionRecipe[], opts: SessionOptions)
 			steps.push(currentTemp ? `### Oven at ${currentTemp}ºF` : "### Stovetop and no-cook");
 		}
 		const t = timing(r);
-		steps.push(`#### ${link(r)}${t ? `\n_${t}_` : ""}\n\n${extractSteps(r.content)}`);
+		steps.push(`#### ${dot(r)} ${link(r)}${t ? `\n_${t}_` : ""}\n\n${extractSteps(r.content)}`);
 	}
 
 	const storeReheat = ordered
@@ -325,7 +349,7 @@ export function buildSessionNote(recipes: SessionRecipe[], opts: SessionOptions)
 			const reheat = extractSection(r.content, "Reheat it");
 			if (!store && !reheat) return "";
 			return [
-				`### ${r.title}`,
+				`### ${dot(r)} ${r.title}`,
 				store ? `**Store:** ${store}` : "",
 				reheat ? `**Reheat:** ${reheat}` : "",
 			]

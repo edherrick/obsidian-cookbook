@@ -120,7 +120,8 @@ describe("buildPrepList", () => {
 	it("merges one ingredient across recipes and totals it", () => {
 		const dice = list.slice(list.indexOf("### Dice"), list.indexOf("### Mince"));
 		expect(dice).toContain("**butternut squash** · 4 cups · small");
-		expect(dice).toContain("Burritos (2 cups), One-Pan (2 cups)");
+		// Cook order is Soup, Burritos, One-Pan, so Burritos is orange, One-Pan yellow
+		expect(dice).toContain("— 🟠 2 cups, 🟡 2 cups");
 	});
 
 	it("reads untagged prep words too", () => {
@@ -141,9 +142,9 @@ describe("buildPrepList", () => {
 			`- [ ] 1 tsp fresh ginger | #prep/mince\n\nRice.\n\n---\n- [ ] 1 tsp fresh ginger | #prep/mince\n\nSauce.\n`,
 		);
 		const mince = buildPrepList([skillet], opts);
-		expect(mince).toContain("**fresh ginger** · 2 tsp — _Skillet_");
+		expect(mince).toContain("**fresh ginger** · 2 tsp — 🔴");
 		const both = buildPrepList([skillet, { ...skillet, path: "Other.md", title: "Other" }], opts);
-		expect(both).toContain("_Skillet (2 tsp), Other (2 tsp)_");
+		expect(both).toContain("**fresh ginger** · 4 tsp — 🔴 2 tsp, 🟠 2 tsp");
 	});
 
 	it("scales by the recipe's multiplier", () => {
@@ -173,6 +174,10 @@ describe("buildSessionNote", () => {
 		expect(note).toContain("### Oven at 350ºF");
 		expect(note).toContain("### Oven at 375ºF");
 		expect(note).toContain("**Store:** Freeze for 3 months.");
+		// The same dot marks a recipe in the key, its steps, and its storage
+		expect(note).toContain("## Recipes\n- 🔴 [[Soup|Soup]]");
+		expect(note).toContain("#### 🟠 [[Burritos|Burritos]]");
+		expect(note).toContain("### 🟠 Burritos");
 		expect(note.trimEnd().endsWith("## My notes")).toBe(true);
 	});
 
