@@ -80,6 +80,39 @@ export function isCountUnit(token: string): boolean {
 	return COUNT_SET.has(canonicalUnit(token));
 }
 
+/** Spelled-out units as [singular, plural]; abbreviations never inflect. */
+const UNIT_FORMS: [string, string][] = [
+	["teaspoon", "teaspoons"], ["tablespoon", "tablespoons"], ["cup", "cups"],
+	["pint", "pints"], ["quart", "quarts"], ["gallon", "gallons"],
+	["liter", "liters"], ["litre", "litres"], ["milliliter", "milliliters"],
+	["gram", "grams"], ["kilogram", "kilograms"], ["ounce", "ounces"], ["pound", "pounds"],
+	["clove", "cloves"], ["can", "cans"], ["tin", "tins"], ["jar", "jars"],
+	["stick", "sticks"], ["bunch", "bunches"], ["slice", "slices"], ["piece", "pieces"],
+	["package", "packages"], ["packet", "packets"], ["pinch", "pinches"],
+	["dash", "dashes"], ["head", "heads"], ["sprig", "sprigs"], ["stalk", "stalks"],
+	["handful", "handfuls"], ["sheet", "sheets"],
+];
+const SINGULAR_OF = new Map(UNIT_FORMS.map(([s, p]) => [p, s]));
+const PLURAL_OF = new Map(UNIT_FORMS);
+
+/** One spelling per unit, so "clove" and "cloves" are the same unit. */
+export function unitKey(unit: string): string {
+	const u = canonicalUnit(unit);
+	return SINGULAR_OF.get(u) ?? u;
+}
+
+/** "cup" for 1, "cups" for 2. Abbreviations and unknown units are left as written. */
+export function inflectUnit(unit: string, qty: number): string {
+	const key = unitKey(unit);
+	const plural = PLURAL_OF.get(key);
+	if (!plural) return unit;
+	const wanted = qty > 1 ? plural : key;
+	if (canonicalUnit(unit) === wanted) return unit;
+	return unit.charAt(0) !== unit.charAt(0).toLowerCase()
+		? wanted.charAt(0).toUpperCase() + wanted.slice(1)
+		: wanted;
+}
+
 export function getUnitDimension(unit: string): UnitDimension | null {
 	const u = canonicalUnit(unit);
 	if (u in VOLUME_ML) return "volume";

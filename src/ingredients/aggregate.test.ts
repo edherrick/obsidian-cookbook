@@ -25,6 +25,18 @@ describe("aggregateItems", () => {
 		expect(aggregateItems([item("butter", 1, "cup"), item("butter", 100, "g")])).toHaveLength(2);
 	});
 
+	it("merges singular and plural spellings of a count unit", () => {
+		const result = aggregateItems([item("garlic", 1, "clove"), item("garlic", 6, "cloves")]);
+		expect(result).toHaveLength(1);
+		expect(result[0]!.quantity).toBe(7);
+		expect(result[0]!.unit).toBe("cloves");
+	});
+
+	it("pluralizes a spelled-out unit once the total passes one", () => {
+		const result = aggregateItems([item("tomatoes", 1, "cup"), item("tomatoes", 1, "cup")]);
+		expect(result[0]!.unit).toBe("cups");
+	});
+
 	it("keeps different count units separate", () => {
 		expect(aggregateItems([item("garlic", 2, "cloves"), item("garlic", 1, "head")])).toHaveLength(2);
 	});

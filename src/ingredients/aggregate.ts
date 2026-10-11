@@ -1,6 +1,6 @@
 import type { ShoppingItem } from "../types";
 import { normalizeIngredientName } from "./normalize";
-import { canonicalUnit, fromBaseUnit, getUnitDimension, roundQty, toBaseUnit } from "./units";
+import { fromBaseUnit, getUnitDimension, inflectUnit, roundQty, toBaseUnit, unitKey } from "./units";
 
 export interface DisplayUnitPrefs {
 	preferredVolumeUnit?: string;
@@ -12,7 +12,8 @@ export interface DisplayUnitPrefs {
  * - Same unit: quantities are summed directly.
  * - Different units, same dimension (both volume or both weight):
  *   converted to a base unit, summed, and displayed in the preferred unit.
- * - Count units (cloves, cans…) only merge when the unit is identical.
+ * - Count units (cloves, cans…) only merge with the same unit ("clove" and
+ *   "cloves" count as the same unit).
  * - Incompatible units (volume vs weight): kept as separate entries.
  * - Items without units: aggregated by name only.
  *
@@ -33,7 +34,7 @@ export function aggregateItems(
 		// Counts never convert, so the unit itself is part of their identity
 		const key =
 			dimension === "count"
-				? `${nameKey}::count::${canonicalUnit(item.unit!)}`
+				? `${nameKey}::count::${unitKey(item.unit!)}`
 				: dimension
 					? `${nameKey}::${dimension}`
 					: nameKey;
@@ -45,9 +46,10 @@ export function aggregateItems(
 		}
 
 		if (existing.quantity !== null && item.quantity !== null) {
-			if (!existing.unit || !item.unit || canonicalUnit(existing.unit) === canonicalUnit(item.unit)) {
+			if (!existing.unit || !item.unit || unitKey(existing.unit) === unitKey(item.unit)) {
 				// No units or same unit — plain addition
 				existing.quantity = roundQty(existing.quantity + item.quantity);
+				if (existing.unit) existing.unit = inflectUnit(existing.unit, existing.quantity);
 			} else if (dimension && dimension !== "count") {
 				// Different units, same dimension — convert via base
 				const base =

@@ -135,6 +135,17 @@ describe("buildPrepList", () => {
 		expect(list).not.toContain("curly kale");
 	});
 
+	it("lists a recipe once when it uses an ingredient in two steps", () => {
+		const skillet = recipe(
+			"Skillet.md",
+			`- [ ] 1 tsp fresh ginger | #prep/mince\n\nRice.\n\n---\n- [ ] 1 tsp fresh ginger | #prep/mince\n\nSauce.\n`,
+		);
+		const mince = buildPrepList([skillet], opts);
+		expect(mince).toContain("**fresh ginger** · 2 tsp — _Skillet_");
+		const both = buildPrepList([skillet, { ...skillet, path: "Other.md", title: "Other" }], opts);
+		expect(both).toContain("_Skillet (2 tsp), Other (2 tsp)_");
+	});
+
 	it("scales by the recipe's multiplier", () => {
 		const doubled = buildPrepList([{ ...burritos, multiplier: 2 }], opts);
 		expect(doubled).toContain("4 cups");

@@ -4,9 +4,11 @@ import {
 	formatQty,
 	fromBaseUnit,
 	getUnitDimension,
+	inflectUnit,
 	isCountUnit,
 	isKnownUnit,
 	toBaseUnit,
+	unitKey,
 } from "./units";
 
 describe("canonicalUnit", () => {
@@ -105,5 +107,25 @@ describe("formatQty", () => {
 
 	it("rounds near-whole fractions up when fractional part exceeds 0.99", () => {
 		expect(formatQty(1.995)).toBe("2");
+	});
+});
+
+describe("unitKey / inflectUnit", () => {
+	it("treats singular and plural spellings as one unit", () => {
+		expect(unitKey("cloves")).toBe("clove");
+		expect(unitKey("Bunches")).toBe("bunch");
+		expect(unitKey("tbsp")).toBe("tbsp");
+	});
+
+	it("inflects spelled-out units to match the quantity", () => {
+		expect(inflectUnit("cup", 2)).toBe("cups");
+		expect(inflectUnit("cloves", 1)).toBe("clove");
+		expect(inflectUnit("Cup", 3)).toBe("Cups");
+		expect(inflectUnit("cups", 0.5)).toBe("cup");
+	});
+
+	it("leaves abbreviations and unknown units alone", () => {
+		expect(inflectUnit("tsp", 2)).toBe("tsp");
+		expect(inflectUnit("oz", 12)).toBe("oz");
 	});
 });

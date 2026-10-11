@@ -152,9 +152,19 @@ function prepLine(entries: PrepEntry[], opts: SessionOptions): string {
 	const details = [
 		...new Set(entries.map((e) => (e.detail ? tidy(e.detail) : "")).filter((d) => d.length > 0)),
 	];
-	const sources = entries.map((e) => {
-		const a = amount(e.item);
-		return a ? `${e.recipe.title} (${a})` : e.recipe.title;
+	// A recipe that uses the ingredient in two steps is still one source
+	const byRecipe = new Map<string, PrepEntry[]>();
+	for (const e of entries) byRecipe.set(e.recipe.path, [...(byRecipe.get(e.recipe.path) ?? []), e]);
+	const sources = [...byRecipe.values()].map((group) => {
+		const a = aggregateItems(
+			group.map((e) => e.item),
+			opts.unitPrefs,
+			keyOf,
+		)
+			.map(amount)
+			.filter(Boolean)
+			.join(" + ");
+		return a ? `${group[0]!.recipe.title} (${a})` : group[0]!.recipe.title;
 	});
 
 	const name = tidy(entries[0]!.item.text) || entries[0]!.item.text;
@@ -162,7 +172,7 @@ function prepLine(entries: PrepEntry[], opts: SessionOptions): string {
 		.filter(Boolean)
 		.join(" · ");
 	// One source needs no breakdown when it is the whole total
-	const tail = entries.length > 1 ? sources.join(", ") : entries[0]!.recipe.title;
+	const tail = byRecipe.size > 1 ? sources.join(", ") : entries[0]!.recipe.title;
 	return `- [ ] ${head} — _${tail}_`;
 }
 
