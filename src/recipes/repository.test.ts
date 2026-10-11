@@ -1,8 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { writable } from "svelte/store";
 import {
+	applySetCookSoon,
 	applySetMultiplier,
 	applyToggleCookSoon,
+	applyToggleCookTogether,
 	flushCookSoon,
 	getRecipes,
 	isIgnored,
@@ -238,5 +240,62 @@ describe("applySetMultiplier", () => {
 		applySetMultiplier(store, "Recipes/Soup.md", 4);
 		expect(read(store)[0]!.cook_multiplier).toBe(4);
 		expect(read(store)[1]!.cook_multiplier).toBe(1);
+	});
+});
+
+describe("cook-together", () => {
+	it("reads the cook-together flag from frontmatter", async () => {
+		const app = makeApp([
+			{ path: "a.md", frontmatter: { tags: ["recipe"], "cook-together": true } },
+			{ path: "b.md", frontmatter: { tags: ["recipe"] } },
+		]);
+		const recipes = await getRecipes(app);
+		expect(recipes.map((r) => r.cook_together)).toEqual([true, false]);
+	});
+
+	it("toggles cook-together without touching cook-soon", () => {
+		const fm: Record<string, unknown> = { tags: ["recipe"] };
+		const app = makeApp([{ path: "a.md", frontmatter: fm }]);
+		const store = writable<Recipe[]>([recipeFixture("a.md", { cook_soon: true })]);
+		applyToggleCookTogether(store, "a.md", app, "cook-together");
+		let list: Recipe[] = [];
+		store.subscribe((v) => (list = v))();
+		expect(list[0]!.cook_together).toBe(true);
+		expect(list[0]!.cook_soon).toBe(true);
+		expect(fm["cook-together"]).toBe(true);
+	});
+
+	it("marks several recipes cook-soon and writes only the ones that change", () => {
+		const fmA: Record<string, unknown> = { tags: ["recipe"] };
+		const fmB: Record<string, unknown> = { tags: ["recipe"], "cook-soon": true };
+		const app = makeApp([
+			{ path: "a.md", frontmatter: fmA },
+			{ path: "b.md", frontmatter: fmB },
+		]);
+		const store = writable<Recipe[]>([
+			recipeFixture("a.md"),
+			recipeFixture("b.md", { cook_soon: true }),
+		]);
+		applySetCookSoon(store, ["a.md", "b.md"], app, "cook-soon");
+		let list: Recipe[] = [];
+		store.subscribe((v) => (list = v))();
+		expect(list.every((r) => r.cook_soon)).toBe(true);
+		expect(fmA["cook-soon"]).toBe(true);
+	});
+});
+
+describe("technique tags", () => {
+	it("collects technique tags into a filterable property", async () => {
+		const app = makeApp([
+			{
+				path: "a.md",
+				frontmatter: { tags: ["recipe"] },
+				inlineTags: ["#prep/dice", "#prep/peel", "#prep/dice", "#other/tag"],
+			},
+		]);
+		const [recipe] = await getRecipes(app, "cook-soon", [], undefined, "#recipe", {
+			techniqueTagPrefix: "prep",
+		});
+		expect(recipe!.technique).toEqual(["dice", "peel"]);
 	});
 });

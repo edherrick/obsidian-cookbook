@@ -53,3 +53,13 @@ export interface StoreLayout {
 	name: string;
 	aisleOrder: string[];
 }
+
+/**
+ * A prep technique. Recipes name one with the tag `#<prefix>/<name>`; its
+ * keywords are the untagged words that count as it ("cubed" is dice). The
+ * order of the list is the order prep is done in — peel before you dice.
+ */
+export type Technique = KeywordGroup;
+
+/** One canonical ingredient name, and the other names that mean the same thing. */
+export type IngredientAlias = KeywordGroup;

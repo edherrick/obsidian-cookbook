@@ -1,4 +1,10 @@
-import type { ShoppingCategory, IngredientGroup, StoreLayout } from "../types";
+import type {
+	ShoppingCategory,
+	IngredientGroup,
+	StoreLayout,
+	Technique,
+	IngredientAlias,
+} from "../types";
 import { DEFAULT_SETTINGS } from "./defaults";
 
 export interface CookbookSettings {
@@ -17,6 +23,17 @@ export interface CookbookSettings {
 	/** One route per shop; the active one orders the shopping list. */
 	storeLayouts: StoreLayout[];
 	activeStoreLayout?: string;
+	/** Marks recipes to be cooked in one session, separately from cook-soon. */
+	cookTogetherProp: string;
+	cookSessionFolder: string;
+	/** Technique tags are `#<prefix>/<name>`. */
+	techniqueTagPrefix: string;
+	techniques: Technique[];
+	ingredientAliases: IngredientAlias[];
+	/** Ingredients nearly every recipe uses; they say nothing about overlap. */
+	stapleIngredients: string[];
+	/** Aisles left out of overlap scoring, for the same reason. */
+	overlapIgnoreCategories: string[];
 }
 
 export { DEFAULT_SETTINGS };
@@ -44,6 +61,13 @@ export function cloneDefaultSettings(): CookbookSettings {
 			...l,
 			aisleOrder: [...l.aisleOrder],
 		})),
+		techniques: DEFAULT_SETTINGS.techniques.map((t) => ({ ...t, keywords: [...t.keywords] })),
+		ingredientAliases: DEFAULT_SETTINGS.ingredientAliases.map((a) => ({
+			...a,
+			keywords: [...a.keywords],
+		})),
+		stapleIngredients: [...DEFAULT_SETTINGS.stapleIngredients],
+		overlapIgnoreCategories: [...DEFAULT_SETTINGS.overlapIgnoreCategories],
 	};
 }
 

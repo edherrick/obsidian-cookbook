@@ -5,16 +5,34 @@
 	import type { Recipe } from "../../recipes/repository";
 	import MultiplierControl from "../components/MultiplierControl.svelte";
 	import { resolveCoverSrc } from "../../utils/coverImage";
+	import type { OverlapMatch } from "../../recipes/overlap";
 
-	const { recipe, app, close, onToggleCookSoon, onSetMultiplier, cookSoonProp = "cook-soon", coverProp = "cover" } = $props<{
+	const {
+		recipe,
+		app,
+		close,
+		onToggleCookSoon,
+		onToggleCookTogether,
+		onSetMultiplier,
+		cookSoonProp = "cook-soon",
+		cookTogetherProp = "cook-together",
+		coverProp = "cover",
+		cooksWellWith = [],
+	} = $props<{
 		recipe: Recipe;
 		app: App;
 		close: () => void;
 		onToggleCookSoon?: () => void;
+		onToggleCookTogether?: () => void;
 		onSetMultiplier?: (multiplier: number) => void;
 		cookSoonProp?: string;
+		cookTogetherProp?: string;
 		coverProp?: string;
+		cooksWellWith?: OverlapMatch[];
 	}>();
+
+	/** Top matches only — past three the overlap is too thin to plan around. */
+	const COOKS_WELL_WITH_LIMIT = 3;
 
 	// svelte-ignore state_referenced_locally
 	const HIDDEN_KEYS = new Set([
@@ -26,6 +44,9 @@
 		"tags",
 		"cook_soon",
 		cookSoonProp,
+		"cook_together",
+		cookTogetherProp,
+		"cook_multiplier",
 	]);
 
 	// svelte-ignore state_referenced_locally — recipe is stable for this modal
@@ -40,6 +61,10 @@
 	// svelte-ignore state_referenced_locally
 	const initialMultiplier = recipe.cook_multiplier ?? 1;
 	let cookSoon = $state(initialCookSoon);
+	// svelte-ignore state_referenced_locally
+	let cookTogether = $state(!!recipe.cook_together);
+	// svelte-ignore state_referenced_locally
+	const overlap = cooksWellWith.slice(0, COOKS_WELL_WITH_LIMIT);
 	let multiplier = $state(initialMultiplier);
 	let renderComp: Component | null = null;
 
@@ -89,6 +114,22 @@
 	function handleToggleCookSoon() {
 		cookSoon = !cookSoon;
 		onToggleCookSoon?.();
+	}
+
+	function handleToggleCookTogether() {
+		cookTogether = !cookTogether;
+		onToggleCookTogether?.();
+	}
+
+	function titleOf(path: string): string {
+		return path.split("/").pop()!.replace(/\.md$/, "");
+	}
+
+	function openRecipe(path: string) {
+		const file = app.vault.getFileByPath(path);
+		if (!file) return;
+		void app.workspace.getLeaf(false).openFile(file);
+		close();
 	}
 
 
@@ -142,7 +183,35 @@
 			/>
 		{/if}
 
+		<label class="cook-soon-toggle">
+			<input
+				type="checkbox"
+				checked={cookTogether}
+				onchange={handleToggleCookTogether}
+			/>
+			Cook together
+		</label>
 	</div>
+
+	{#if overlap.length > 0}
+		<div class="cooks-well-with">
+			<span class="info-key">Cooks well with</span>
+			<ul>
+				{#each overlap as match (match.path)}
+					<li>
+						<button class="overlap-link" onclick={() => openRecipe(match.path)}>
+							{titleOf(match.path)}
+						</button>
+						<span class="overlap-shared">
+							{#each match.shared as name (name)}
+								<span class="tag">{name}</span>
+							{/each}
+						</span>
+					</li>
+				{/each}
+			</ul>
+		</div>
+	{/if}
 
 	<hr class="divider" />
 
@@ -236,6 +305,50 @@
 		gap: 6px;
 		font-size: 0.9em;
 		cursor: pointer;
+	}
+
+	.cooks-well-with {
+		display: flex;
+		flex-direction: column;
+		gap: 0.3rem;
+		font-size: 0.88em;
+	}
+
+	.cooks-well-with ul {
+		margin: 0;
+		padding: 0;
+		list-style: none;
+		display: flex;
+		flex-direction: column;
+		gap: 0.3rem;
+	}
+
+	.cooks-well-with li {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.4rem;
+	}
+
+	.overlap-link {
+		padding: 0;
+		height: auto;
+		background: none;
+		box-shadow: none;
+		border: none;
+		color: var(--link-color);
+		cursor: pointer;
+		text-align: left;
+	}
+
+	.overlap-link:hover {
+		text-decoration: underline;
+	}
+
+	.overlap-shared {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.25rem;
 	}
 
 	.divider {

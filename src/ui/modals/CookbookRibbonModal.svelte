@@ -2,31 +2,41 @@
 	import { obsidianIcon } from "../../utils/obsidianIcon";
 	import { onMount } from "svelte";
 	import MultiplierControl from "../components/MultiplierControl.svelte";
-	import { applyToggleCookSoon, applySetMultiplier } from "../../recipes/repository";
+	import {
+		applyToggleCookSoon,
+		applyToggleCookTogether,
+		applySetMultiplier,
+	} from "../../recipes/repository";
 	import type { Recipe } from "../../recipes/repository";
 
 	const {
 		openRecipeModal,
 		generateShoppingList,
+		createCookSession,
 		refreshRecipes,
 		stores,
 		app,
 		close,
 		cookSoonProp = "cook-soon",
+		cookTogetherProp = "cook-together",
 	} = $props<{
 		openRecipeModal: () => void;
 		generateShoppingList: () => Promise<void>;
+		createCookSession: (markCookSoon: boolean) => Promise<void>;
 		refreshRecipes: () => Promise<void>;
 		stores: import("../../recipes/recipeStores").RecipeStores;
 		app: import("obsidian").App;
 		close: () => void;
 		cookSoonProp?: string;
+		cookTogetherProp?: string;
 	}>();
 
 	// svelte-ignore state_referenced_locally — stores is a stable reference
-	const { selectedRecipes } = stores;
+	const { selectedRecipes, cookTogetherRecipes } = stores;
 
 	let generating = $state(false);
+	let startingSession = $state(false);
+	let alsoCookSoon = $state(false);
 
 	onMount(() => {
 		void refreshRecipes();
@@ -38,6 +48,20 @@
 
 	function setMultiplier(path: string, multiplier: number) {
 		applySetMultiplier(stores.recipes, path, multiplier);
+	}
+
+	function toggleCookTogether(path: string) {
+		applyToggleCookTogether(stores.recipes, path, app, cookTogetherProp);
+	}
+
+	async function handleStartSession() {
+		startingSession = true;
+		try {
+			await createCookSession(alsoCookSoon);
+			close();
+		} finally {
+			startingSession = false;
+		}
 	}
 
 	async function handleGenerate() {
@@ -81,6 +105,33 @@
 			No recipes selected. Open the Cookbook and mark recipes as
 			"cook soon".
 		</p>
+	{/if}
+
+	{#if $cookTogetherRecipes && $cookTogetherRecipes.length > 0}
+		<div class="selected-recipes">
+			<h3>Cook together</h3>
+			<ul>
+				{#each $cookTogetherRecipes as recipe (recipe.path)}
+					<li>
+						<input
+							type="checkbox"
+							checked={!!recipe.cook_together}
+							aria-label="Cook {(recipe as Recipe).title ?? (recipe as Recipe).path} together"
+							onchange={() => toggleCookTogether(recipe.path)}
+						/>
+						<span class="recipe-title">{(recipe as Recipe).title ?? (recipe as Recipe).path}</span>
+					</li>
+				{/each}
+			</ul>
+			<label class="session-option">
+				<input type="checkbox" bind:checked={alsoCookSoon} />
+				Also mark them cook soon (for the shopping list)
+			</label>
+			<button class="btn mod-cta" onclick={handleStartSession} disabled={startingSession}>
+				<span use:obsidianIcon={"chef-hat"} class="btn-icon"></span>
+				<span class="btn-label">{startingSession ? "Writing…" : "Start cooking session"}</span>
+			</button>
+		</div>
 	{/if}
 
 	<div class="btn-row">
@@ -141,6 +192,15 @@
 	.mult-push {
 		margin-left: auto;
 		display: flex;
+	}
+
+	.session-option {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		font-size: 0.85em;
+		color: var(--text-muted);
+		margin: 0.5rem 0;
 	}
 
 	.no-selection {

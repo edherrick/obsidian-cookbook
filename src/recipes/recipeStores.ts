@@ -6,6 +6,7 @@ import type { PersistedShoppingList } from "../types";
 export interface RecipeStores {
 	recipes: Writable<Recipe[]>;
 	selectedRecipes: Readable<Recipe[]>;
+	cookTogetherRecipes: Readable<Recipe[]>;
 	shoppingList: Writable<PersistedShoppingList | null>;
 	hideCheckedItems: Writable<boolean>;
 }
@@ -17,7 +18,15 @@ export function createRecipeStores(hideCheckedItems = false): RecipeStores {
 		$r.filter((r) => r.cook_soon),
 	);
 
+	const cookTogetherRecipes = derived(recipes, ($r) => $r.filter((r) => r.cook_together));
+
 	const shoppingList = writable<PersistedShoppingList | null>(null);
 
-	return { recipes, selectedRecipes, shoppingList, hideCheckedItems: writable(hideCheckedItems) };
+	return {
+		recipes,
+		selectedRecipes,
+		cookTogetherRecipes,
+		shoppingList,
+		hideCheckedItems: writable(hideCheckedItems),
+	};
 }

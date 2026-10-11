@@ -134,6 +134,9 @@ export const DEFAULT_SETTINGS: CookbookSettings = {
 			name: "Pantry",
 			keywords: [
 				"pasta", "rice", "noodle", "stock", "broth", "lentil", "chickpea",
+				// Longer than "chicken"/"beef", so these beat the meat aisle
+				"chicken broth", "chicken stock", "beef broth", "beef stock",
+				"vegetable broth", "vegetable stock", "bone broth",
 				"black bean", "kidney bean", "cannellini", "butter bean", "oat",
 				"quinoa", "couscous", "barley", "bulgur", "farro", "rotini", "penne",
 				"fusilli", "rigatoni", "spaghetti", "macaroni", "orzo", "linguine",
@@ -221,4 +224,47 @@ export const DEFAULT_SETTINGS: CookbookSettings = {
 		},
 	],
 	activeStoreLayout: "Default",
+
+	cookTogetherProp: "cook-together",
+	cookSessionFolder: "recipes/cook sessions",
+
+	// In prep order: a cook session's prep list is walked top to bottom. Keywords
+	// are what an untagged prep note says ("drained and rinsed" is rinse).
+	techniqueTagPrefix: "prep",
+	techniques: [
+		{ name: "peel", keywords: ["peeled"] },
+		{ name: "halve", keywords: ["halved", "cut in half"] },
+		{ name: "seed", keywords: ["seeded", "deseeded", "seeds removed", "cored"] },
+		{ name: "quarter", keywords: ["quartered"] },
+		{ name: "dice", keywords: ["diced", "cubed", "small-diced", "cut into cubes"] },
+		{ name: "chop", keywords: ["chopped"] },
+		{ name: "mince", keywords: ["minced"] },
+		{ name: "slice", keywords: ["sliced", "strips", "julienned"] },
+		{ name: "shred", keywords: ["shredded"] },
+		{ name: "grate", keywords: ["grated"] },
+		{ name: "zest", keywords: ["zested"] },
+		{ name: "juice", keywords: ["juiced"] },
+		{ name: "rinse", keywords: ["rinsed", "drained", "washed"] },
+	],
+
+	// Only true synonyms. A merge from the ingredient names panel adds to these.
+	ingredientAliases: [
+		{ name: "scallion", keywords: ["green onion", "spring onion"] },
+		{ name: "cilantro", keywords: ["fresh coriander", "coriander leaves"] },
+		{ name: "chickpeas", keywords: ["garbanzo beans"] },
+		{ name: "powdered sugar", keywords: ["confectioners sugar", "icing sugar"] },
+		{ name: "zucchini", keywords: ["courgette"] },
+		{ name: "eggplant", keywords: ["aubergine"] },
+	],
+
+	// Matched against the line as written, so "dried thyme" is a staple while
+	// fresh thyme still counts.
+	stapleIngredients: [
+		"salt", "black pepper", "olive oil", "vegetable oil", "neutral oil",
+		"oil spray", "water", "butter", "sugar", "garlic powder", "onion powder",
+		"dried thyme", "dried rosemary", "dried oregano", "dried basil",
+		"dried parsley", "dried sage", "ground sage", "red pepper flakes",
+		"crushed red pepper",
+	],
+	overlapIgnoreCategories: ["Baking & Spices", "Pantry"],
 };

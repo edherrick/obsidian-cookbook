@@ -2,6 +2,7 @@ import type { Recipe } from "../recipes/repository";
 import type { ParsedIngredient } from "../ingredients/parse";
 import type { IngredientGroup } from "../types";
 import { matchesGroup } from "../ingredients/categorize";
+import type { Vocabulary } from "../vocab/vocabulary";
 
 export const HAS_INGREDIENT_KEY = "__has-ingredient";
 export const EXCLUDES_INGREDIENT_KEY = "__excludes-ingredient";
@@ -42,6 +43,8 @@ export type FilterValue =
 export interface FilterContext {
 	ingredientsByPath: Map<string, ParsedIngredient[]>;
 	ingredientGroups: IngredientGroup[];
+	/** With aliases, searching "green onion" also finds a recipe's "scallion". */
+	vocab?: Vocabulary;
 }
 
 /**
@@ -97,7 +100,17 @@ export function buildFilterOptions(
 }
 
 function ingredientTexts(recipe: Recipe, ctx: FilterContext): string[] {
-	return (ctx.ingredientsByPath.get(recipe.path) ?? []).map((i) => i.text.toLowerCase());
+	return (ctx.ingredientsByPath.get(recipe.path) ?? []).flatMap((i) => {
+		const text = i.text.toLowerCase();
+		const canonical = ctx.vocab?.canonicalText(i.text).toLowerCase();
+		return canonical && canonical !== text ? [text, canonical] : [text];
+	});
+}
+
+/** Does any ingredient text contain the query, or the query's canonical name? */
+function containsIngredient(texts: string[], query: string, ctx: FilterContext): boolean {
+	const canonical = ctx.vocab?.canonicalText(query).toLowerCase();
+	return texts.some((t) => t.includes(query) || (!!canonical && t.includes(canonical)));
 }
 
 function recipeHasGroup(recipe: Recipe, groupName: string, ctx: FilterContext): boolean {
@@ -133,7 +146,7 @@ export function recipeMatchesFilters(
 			case "has-ingredient": {
 				if (filter.ingredients.length === 0) continue;
 				const texts = ingredientTexts(recipe, ctx);
-				const matches = filter.ingredients.map((q) => texts.some((t) => t.includes(q)));
+				const matches = filter.ingredients.map((q) => containsIngredient(texts, q, ctx));
 				if (!(filter.logic === "and" ? matches.every(Boolean) : matches.some(Boolean))) {
 					return false;
 				}
@@ -142,7 +155,7 @@ export function recipeMatchesFilters(
 			case "excludes-ingredient": {
 				if (filter.ingredients.length === 0) continue;
 				const texts = ingredientTexts(recipe, ctx);
-				if (filter.ingredients.some((q) => texts.some((t) => t.includes(q)))) return false;
+				if (filter.ingredients.some((q) => containsIngredient(texts, q, ctx))) return false;
 				break;
 			}
 			case "has-group": {

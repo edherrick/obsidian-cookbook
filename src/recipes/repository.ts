@@ -5,6 +5,7 @@ import type { Writable } from "svelte/store";
 export interface Recipe {
 	path: string;
 	cook_soon: boolean;
+	cook_together?: boolean;
 	cook_multiplier: number;
 	title: string;
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -25,13 +26,24 @@ export function isIgnored(filePath: string, ignorePaths: string[]): boolean {
 	return false;
 }
 
+export interface RecipeScanOptions {
+	cookTogetherProp?: string;
+	/** Technique tags (`#prep/dice`) become a filterable `technique` property. */
+	techniqueTagPrefix?: string;
+}
+
 export async function getRecipes(
 	app: App,
 	cookSoonProp = "cook-soon",
 	ignorePaths: string[] = [],
 	recipesFolder?: string,
 	recipesTag = "#recipe",
+	options: RecipeScanOptions = {},
 ): Promise<Recipe[]> {
+	const cookTogetherProp = options.cookTogetherProp ?? "cook-together";
+	const techniquePrefix = options.techniqueTagPrefix
+		? `#${options.techniqueTagPrefix.replace(/^#/, "").replace(/\/+$/, "")}/`.toLowerCase()
+		: null;
 	// Only markdown files can carry recipe frontmatter — skip images, PDFs, etc.
 	const files: TFile[] = app.vault.getMarkdownFiles();
 	const recipes: Recipe[] = [];
@@ -58,10 +70,23 @@ export async function getRecipes(
 
 		if (!normalizedTags.includes(expectedTag)) continue;
 
+		const techniques = techniquePrefix
+			? [
+					...new Set(
+						inlineTags
+							.filter((t) => t.toLowerCase().startsWith(techniquePrefix))
+							.map((t) => t.slice(techniquePrefix.length).toLowerCase()),
+					),
+				].sort()
+			: [];
+
 		recipes.push({
+			// A frontmatter `technique` property, if a vault has one, wins
+			...(techniques.length > 0 ? { technique: techniques } : {}),
 			...fm,
 			path: file.path,
 			cook_soon: !!fm[cookSoonProp],
+			cook_together: !!fm[cookTogetherProp],
 			cook_multiplier: 1,
 			title: (fm.title as string | undefined) ?? file.basename,
 			__tags: normalizedTags,
@@ -71,14 +96,19 @@ export async function getRecipes(
 	return recipes;
 }
 
-export async function flushCookSoon(recipe: Recipe, app: App, cookSoonProp = "cook-soon") {
-	if (!recipe.path) return;
-	const file = app.vault.getFileByPath(recipe.path);
+/** Write one boolean recipe flag back to its note's frontmatter. */
+async function flushFlag(path: string, value: boolean, app: App, prop: string) {
+	if (!path) return;
+	const file = app.vault.getFileByPath(path);
 	if (!file) return;
 	await app.fileManager.processFrontMatter(file, (fm) => {
 		// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-		fm[cookSoonProp] = !!recipe.cook_soon;
+		fm[prop] = value;
 	});
+}
+
+export async function flushCookSoon(recipe: Recipe, app: App, cookSoonProp = "cook-soon") {
+	await flushFlag(recipe.path, !!recipe.cook_soon, app, cookSoonProp);
 }
 
 export function toggleCookSoon(recipe: Recipe) {
@@ -96,15 +126,54 @@ export function applyToggleCookSoon(
 	app: App,
 	cookSoonProp: string,
 ): void {
-	let toggled: Recipe | undefined;
+	applyToggleFlag(recipesStore, path, app, "cook_soon", cookSoonProp);
+}
+
+/** Toggle cook-together in the store and write it back to frontmatter. */
+export function applyToggleCookTogether(
+	recipesStore: Writable<Recipe[]>,
+	path: string,
+	app: App,
+	cookTogetherProp: string,
+): void {
+	applyToggleFlag(recipesStore, path, app, "cook_together", cookTogetherProp);
+}
+
+/** Set cook-soon on several recipes at once, writing only those that change. */
+export function applySetCookSoon(
+	recipesStore: Writable<Recipe[]>,
+	paths: string[],
+	app: App,
+	cookSoonProp: string,
+): void {
+	const wanted = new Set(paths);
+	const changed: string[] = [];
+	recipesStore.update((list) =>
+		list.map((r) => {
+			if (!wanted.has(r.path) || r.cook_soon) return r;
+			changed.push(r.path);
+			return { ...r, cook_soon: true, [cookSoonProp]: true };
+		}),
+	);
+	for (const path of changed) void flushFlag(path, true, app, cookSoonProp);
+}
+
+function applyToggleFlag(
+	recipesStore: Writable<Recipe[]>,
+	path: string,
+	app: App,
+	field: "cook_soon" | "cook_together",
+	prop: string,
+): void {
+	let next: boolean | undefined;
 	recipesStore.update((list) =>
 		list.map((r) => {
 			if (r.path !== path) return r;
-			toggled = { ...r, cook_soon: !r.cook_soon, [cookSoonProp]: !r[cookSoonProp] };
-			return toggled;
+			next = !r[field];
+			return { ...r, [field]: next, [prop]: next };
 		}),
 	);
-	if (toggled) void flushCookSoon(toggled, app, cookSoonProp);
+	if (next !== undefined) void flushFlag(path, next, app, prop);
 }
 
 export function applySetMultiplier(

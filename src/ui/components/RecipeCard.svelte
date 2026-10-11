@@ -14,15 +14,21 @@
 		propsToShow = [] as string[],
 		coverProp = "cover",
 		cookSoonProp = "cook-soon",
+		cookTogetherProp = "cook-together",
 		onToggleCookSoon,
+		onToggleCookTogether,
 		onSetMultiplier,
+		getOverlap,
 	} = $props<{
 		recipe: Record<string, any>;
 		propsToShow?: string[];
 		coverProp?: string;
 		cookSoonProp?: string;
+		cookTogetherProp?: string;
 		onToggleCookSoon?: (path: string) => void;
+		onToggleCookTogether?: (path: string) => void;
 		onSetMultiplier?: (path: string, multiplier: number) => void;
+		getOverlap?: (path: string) => import("../../recipes/overlap").OverlapMatch[];
 	}>();
 
 	// Covers may be URLs, vault paths or wikilinks — all need resolving to a src
@@ -33,9 +39,13 @@
 			recipe,
 			app,
 			cookSoonProp,
+			cookTogetherProp,
 			coverProp,
+			cooksWellWith: getOverlap?.(recipe.path) ?? [],
 			onToggleCookSoon: () =>
 				onToggleCookSoon && onToggleCookSoon(recipe.path),
+			onToggleCookTogether: () =>
+				onToggleCookTogether && onToggleCookTogether(recipe.path),
 			onSetMultiplier: (m: number) =>
 				onSetMultiplier && onSetMultiplier(recipe.path, m),
 		}).open();
@@ -72,7 +82,7 @@
 	{/if}
 
 	<div class="recipe-body">
-		{#each propsToShow.filter((key: string) => key in recipe && key !== "title" && key !== coverProp && key !== cookSoonProp) as key (key)}
+		{#each propsToShow.filter((key: string) => key in recipe && key !== "title" && key !== coverProp && key !== cookSoonProp && key !== cookTogetherProp) as key (key)}
 			<span class="field-key">{key}</span>
 			<span class="field-colon">:</span>
 			<span class="field-value">{recipe[key]}</span>
@@ -95,6 +105,17 @@
 					onIncrement={() => onSetMultiplier && onSetMultiplier(recipe.path, (recipe.cook_multiplier ?? 1) + 1)}
 				/>
 			{/if}
+		</span>
+
+		<span class="field-key">cook together</span>
+		<span class="field-colon">:</span>
+		<span class="field-value cook-soon-row">
+			<input
+				type="checkbox"
+				aria-label="Cook {recipe.title ?? recipe.path} together"
+				checked={!!recipe.cook_together}
+				onchange={() => onToggleCookTogether && onToggleCookTogether(recipe.path)}
+			/>
 		</span>
 	</div>
 </div>

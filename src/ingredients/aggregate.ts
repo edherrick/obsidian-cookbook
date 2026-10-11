@@ -19,11 +19,16 @@ export interface DisplayUnitPrefs {
  * Matching is done on the normalised name, so "soy sauce" and "soy sauce, to
  * taste" are one line rather than two.
  */
-export function aggregateItems(items: ShoppingItem[], prefs?: DisplayUnitPrefs): ShoppingItem[] {
+export function aggregateItems(
+	items: ShoppingItem[],
+	prefs?: DisplayUnitPrefs,
+	/** Which ingredient a line is — the vocabulary's key once aliases apply. */
+	keyOf: (text: string) => string = normalizeIngredientName,
+): ShoppingItem[] {
 	const map = new Map<string, ShoppingItem>();
 
 	for (const item of items) {
-		const nameKey = normalizeIngredientName(item.text) || item.text.toLowerCase().trim();
+		const nameKey = keyOf(item.text) || item.text.toLowerCase().trim();
 		const dimension = item.unit ? getUnitDimension(item.unit) : null;
 		// Counts never convert, so the unit itself is part of their identity
 		const key =

@@ -5,6 +5,8 @@ export interface ParsedIngredient {
 	unit: string | null;
 	text: string;
 	prep?: string;
+	/** Nested tags found on the line, without the `#` — e.g. `prep/dice`. */
+	tags?: string[];
 }
 
 // ─── Quantity grammar ─────────────────────────────────────────────────────────
@@ -37,9 +39,26 @@ function evalNumber(expr: string): number {
 const PREP_TAIL_RE =
 	/^(?:or\s+)?(?:finely|roughly|coarsely|thinly|thickly|freshly|well|lightly|very)?\s*(?:chopped|diced|minced|sliced|divided|rinsed|drained|softened|melted|grated|shredded|crushed|peeled|halved|quartered|cubed|julienned|trimmed|beaten|cut|torn|seeded|stemmed|zested|juiced|crumbled|mashed|pitted|deveined|scrubbed|washed|warmed|cooled|separated|smashed|sifted|toasted|roasted|browned|thawed|shaved|pressed|chilled|casings|plus|optional|to taste|for serving|for garnish|at room temperature|room temperature|packed|if desired|as needed)\b/i;
 
+/** The first `|` that is not the alias separator inside a `[[wikilink|alias]]`. */
+function separatorIndex(raw: string): number {
+	let depth = 0;
+	for (let i = 0; i < raw.length; i++) {
+		if (raw.startsWith("[[", i)) {
+			depth++;
+			i++;
+		} else if (raw.startsWith("]]", i) && depth > 0) {
+			depth--;
+			i++;
+		} else if (raw[i] === "|" && depth === 0) {
+			return i;
+		}
+	}
+	return -1;
+}
+
 function splitPrep(raw: string): { ingredient: string; prep?: string } {
 	// Explicit separator wins: "2 cups flour | sifted"
-	const pipeIdx = raw.indexOf("|");
+	const pipeIdx = separatorIndex(raw);
 	if (pipeIdx !== -1) {
 		return {
 			ingredient: raw.slice(0, pipeIdx),
@@ -58,6 +77,43 @@ function splitPrep(raw: string): { ingredient: string; prep?: string } {
 	return { ingredient: raw };
 }
 
+// ─── Tags ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Nested tags only (`#prep/dice`). A tag is never part of an ingredient's
+ * name, so they are lifted off the line wherever they sit, before anything else
+ * reads it. Flat tags are left alone — `#1` is not a tag and `#recipe` is not
+ * written on ingredient lines.
+ */
+const NESTED_TAG_RE = /(?:^|\s)#([A-Za-z][\w-]*(?:\/[\w-]+)+)/g;
+
+function extractTags(raw: string): { rest: string; tags: string[] } {
+	const tags: string[] = [];
+	const rest = raw.replace(NESTED_TAG_RE, (_m, tag: string) => {
+		tags.push(tag);
+		return " ";
+	});
+	return { rest: rest.replace(/\s+/g, " ").trim(), tags };
+}
+
+/**
+ * Prep as the reader sees it: the techniques the tags named, then whatever
+ * else was written. "#prep/peel #prep/dice small" reads "peel, dice · small".
+ */
+function displayPrep(tags: string[], prep: string | undefined): string | undefined {
+	const leaves = tags.map((t) => t.slice(t.lastIndexOf("/") + 1));
+	const parts = [leaves.join(", "), prep?.trim() ?? ""].filter((p) => p.length > 0);
+	return parts.length > 0 ? parts.join(" · ") : undefined;
+}
+
+/** The prep note as written, without the technique names its tags contributed. */
+export function writtenPrep(parsed: Pick<ParsedIngredient, "prep" | "tags">): string | undefined {
+	if (!parsed.prep) return undefined;
+	if (!parsed.tags?.length) return parsed.prep;
+	const rest = parsed.prep.split(" · ").slice(1).join(" · ");
+	return rest || undefined;
+}
+
 // ─── Ingredient parsing ───────────────────────────────────────────────────────
 
 function stripLeadingFiller(s: string): string {
@@ -72,13 +128,17 @@ function stripLeadingFiller(s: string): string {
  * Unit is only extracted if it matches a known cooking unit.
  */
 export function parseIngredient(raw: string): ParsedIngredient {
-	const { ingredient, prep } = splitPrep(raw);
+	const { rest: untagged, tags } = extractTags(raw);
+	const split = splitPrep(untagged);
+	const ingredient = split.ingredient;
+	const prep = displayPrep(tags, split.prep);
+	const tagged = tags.length > 0 ? { tags } : {};
 
 	// Strip leading approximate marker
 	const s = ingredient.replace(/^~\s*/, "").trim();
 
 	const qm = QTY_RE.exec(s);
-	if (!qm) return { quantity: null, unit: null, text: s, prep };
+	if (!qm) return { quantity: null, unit: null, text: s, prep, ...tagged };
 
 	const quantity = evalNumber(qm[1]!);
 
@@ -103,7 +163,7 @@ export function parseIngredient(raw: string): ParsedIngredient {
 	}
 
 	const text = stripLeadingFiller(textWords.join(" "));
-	return { quantity, unit, text: text || rest.trim(), prep };
+	return { quantity, unit, text: text || rest.trim(), prep, ...tagged };
 }
 
 // ─── Checkbox parsing ─────────────────────────────────────────────────────────

@@ -204,3 +204,12 @@ describe("assignCategory — aisle keywords must not outrank the ingredient", ()
 		});
 	}
 });
+
+describe("assignCategory — broth and stock", () => {
+	it("puts meat broths in Pantry, not the meat aisle", () => {
+		const cats = DEFAULT_SETTINGS.shoppingCategories;
+		expect(assignCategory("low-sodium chicken broth", cats)).toBe("Pantry");
+		expect(assignCategory("beef stock", cats)).toBe("Pantry");
+		expect(assignCategory("chicken thighs", cats)).toBe("Meat & Fish");
+	});
+});

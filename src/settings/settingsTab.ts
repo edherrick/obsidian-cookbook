@@ -3,6 +3,14 @@ import type CookbookPlugin from "../main";
 import { PathSuggest } from "../utils/suggesters/PathSuggest";
 import type { IngredientGroup, KeywordGroup, StoreLayout } from "../types";
 import { cloneDefaultSettings } from "./index";
+import { renderIngredientNamesPanel } from "./ingredientNamesPanel";
+
+function commaList(value: string): string[] {
+	return value
+		.split(",")
+		.map((s) => s.trim())
+		.filter((s) => s.length > 0);
+}
 
 /** Keystrokes shouldn't each cost a disk read + write. */
 const SAVE_DEBOUNCE_MS = 400;
@@ -23,6 +31,7 @@ export class CookbookSettingTab extends PluginSettingTab {
 		getItems: () => KeywordGroup[],
 		options: {
 			namePlaceholder: string;
+			keywordsPlaceholder?: string;
 			addLabel: string;
 			reorderable?: boolean;
 			/** Dietary groups only: a second list of terms that must NOT match. */
@@ -56,7 +65,7 @@ export class CookbookSettingTab extends PluginSettingTab {
 
 			const kwInput = fields.createEl("input", { type: "text" });
 			kwInput.className = "cookbook-cat-keywords";
-			kwInput.placeholder = "Keywords, comma-separated";
+			kwInput.placeholder = options.keywordsPlaceholder ?? "Keywords, comma-separated";
 			kwInput.value = item.keywords.join(", ");
 			kwInput.addEventListener("input", () => {
 				items[idx]!.keywords = kwInput.value
@@ -377,6 +386,132 @@ export class CookbookSettingTab extends PluginSettingTab {
 
 		const storesContainer = containerEl.createDiv();
 		this.renderStoreEditor(storesContainer);
+
+		this.renderCookingSettings(containerEl);
+	}
+
+	/** Cook-together sessions, prep techniques, ingredient aliases and overlap. */
+	private renderCookingSettings(containerEl: HTMLElement): void {
+		const { settings } = this.plugin;
+
+		new Setting(containerEl).setName("Cooking sessions").setHeading();
+
+		new Setting(containerEl)
+			.setName("Cook-together property")
+			.setDesc("The frontmatter property that marks recipes to cook in one session.")
+			.addText((text) =>
+				text
+					// eslint-disable-next-line obsidianmd/ui/sentence-case
+					.setPlaceholder("cook-together")
+					.setValue(settings.cookTogetherProp)
+					.onChange((value) => {
+						settings.cookTogetherProp = value.trim() || "cook-together";
+						this.saveDebounced();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Session folder")
+			.setDesc("Where cooking session notes are written. One note per day, regenerated in place.")
+			.addSearch((search) => {
+				new PathSuggest(this.app, search.inputEl, "folder");
+				search
+					// eslint-disable-next-line obsidianmd/ui/sentence-case
+					.setPlaceholder("recipes/cook sessions")
+					.setValue(settings.cookSessionFolder)
+					.onChange((value) => {
+						settings.cookSessionFolder = value.trim();
+						this.saveDebounced();
+					});
+			});
+
+		new Setting(containerEl)
+			.setName("Prep techniques")
+			.setDesc(
+				"Tag a technique on an ingredient line with #prefix/name, e.g. #prep/dice. Words listed here count as the technique on untagged lines. The order is the order of the prep list in a cooking session.",
+			)
+			.setHeading()
+			.addButton((b) =>
+				b.setButtonText("Restore defaults").onClick(() => {
+					settings.techniques = cloneDefaultSettings().techniques;
+					void this.plugin.saveSettings();
+					this.display();
+				}),
+			);
+
+		new Setting(containerEl)
+			.setName("Technique tag prefix")
+			.setDesc("The parent tag for techniques. Changing it does not rewrite existing tags.")
+			.addText((text) =>
+				text
+					// eslint-disable-next-line obsidianmd/ui/sentence-case
+					.setPlaceholder("prep")
+					.setValue(settings.techniqueTagPrefix)
+					.onChange((value) => {
+						settings.techniqueTagPrefix = value.replace(/^#/, "").replace(/\/+$/, "").trim() || "prep";
+						this.saveDebounced();
+					}),
+			);
+
+		const techniquesContainer = containerEl.createDiv();
+		this.renderCategoryEditor(techniquesContainer, () => settings.techniques, {
+			namePlaceholder: "Name (e.g. dice)",
+			keywordsPlaceholder: "Words that mean it, e.g. diced, cubed",
+			addLabel: "Add technique",
+			reorderable: true,
+		});
+
+		new Setting(containerEl)
+			.setName("Ingredient aliases")
+			.setDesc(
+				"Names that mean the same ingredient. Lines using any of them merge on the shopping list, count as overlap and match ingredient filters.",
+			)
+			.setHeading()
+			.addButton((b) =>
+				b.setButtonText("Restore defaults").onClick(() => {
+					settings.ingredientAliases = cloneDefaultSettings().ingredientAliases;
+					void this.plugin.saveSettings();
+					this.display();
+				}),
+			);
+
+		const aliasesContainer = containerEl.createDiv();
+		const renderAliases = () =>
+			this.renderCategoryEditor(aliasesContainer, () => settings.ingredientAliases, {
+				namePlaceholder: "Name (e.g. scallion)",
+				keywordsPlaceholder: "Other names, e.g. green onion, spring onion",
+				addLabel: "Add alias",
+			});
+		renderAliases();
+
+		new Setting(containerEl)
+			.setName("Ingredient names in your recipes")
+			.setDesc("Find names that are really one ingredient and merge them into the aliases above.");
+		renderIngredientNamesPanel(containerEl.createDiv(), this.plugin, renderAliases);
+
+		new Setting(containerEl).setName("Overlap").setHeading();
+
+		new Setting(containerEl)
+			.setName("Staple ingredients")
+			.setDesc(
+				"Ingredients nearly every recipe uses. They are ignored when finding recipes that cook well together. Comma-separated.",
+			)
+			.addTextArea((text) =>
+				text.setValue(settings.stapleIngredients.join(", ")).onChange((value) => {
+					settings.stapleIngredients = commaList(value);
+					this.saveDebounced();
+				}),
+			);
+
+		new Setting(containerEl)
+			.setName("Ignored aisles")
+			.setDesc("Shopping categories whose ingredients don't count as overlap. Comma-separated.")
+			.addText((text) =>
+				text.setValue(settings.overlapIgnoreCategories.join(", ")).onChange((value) => {
+					settings.overlapIgnoreCategories = commaList(value);
+					this.saveDebounced();
+				}),
+			);
 	}
 
 	private renderStoreEditor(container: HTMLElement): void {

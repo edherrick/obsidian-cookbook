@@ -1,4 +1,4 @@
-import { Plugin, TFile, WorkspaceLeaf, debounce } from "obsidian";
+import { Notice, Plugin, TFile, WorkspaceLeaf, debounce } from "obsidian";
 import { get } from "svelte/store";
 import { CookbookSettingTab } from "./settings/settingsTab";
 import { mergeSettings } from "./settings";
@@ -8,15 +8,21 @@ import { SerialQueue } from "./utils/serialQueue";
 import CookbookRibbonModal from "./ui/modals/CookbookRibbonModal.svelte";
 import RecipesModal from "./ui/modals/RecipesModal.svelte";
 import { VIEW_TYPE_SHOPPING, CookbookShoppingView } from "./ui/views/CookbookShoppingView";
-import { getRecipes } from "./recipes/repository";
+import { applySetCookSoon, getRecipes } from "./recipes/repository";
 import type { Recipe } from "./recipes/repository";
 import { createRecipeStores } from "./recipes/recipeStores";
 import type { RecipeStores } from "./recipes/recipeStores";
 import { IngredientCache } from "./ingredients/cache";
+import type { ParsedIngredient } from "./ingredients/parse";
 import { buildShoppingList } from "./shopping/build";
 import { UNCATEGORIZED } from "./ingredients/categorize";
 import { ShoppingListPersistence } from "./shopping/persistence";
 import type { PersistedShoppingList, StoreLayout } from "./types";
+import { Vocabulary } from "./vocab/vocabulary";
+import { writeCookSession } from "./session/write";
+import { VocabularyCheckModal } from "./vocab/checkModal";
+import { indexIngredientNames } from "./vocab/names";
+import type { IngredientName } from "./vocab/names";
 
 /** Frontmatter edits arrive in bursts; rescanning once per burst is enough. */
 const RECIPE_REFRESH_DEBOUNCE_MS = 500;
@@ -24,6 +30,8 @@ const RECIPE_REFRESH_DEBOUNCE_MS = 500;
 export default class CookbookPlugin extends Plugin {
 	settings: CookbookSettings;
 	recipeStores: RecipeStores;
+	/** Aliases, techniques and staples — rebuilt whenever settings change. */
+	vocabulary: Vocabulary;
 
 	private ingredientCache = new IngredientCache();
 	private saveQueue = new SerialQueue();
@@ -84,14 +92,32 @@ export default class CookbookPlugin extends Plugin {
 			callback: () => this.openRecipesModal(),
 		});
 
+		this.addCommand({
+			id: "create-cook-session",
+			name: "Start cooking session",
+			callback: () => void this.createCookSession(false),
+		});
+
+		this.addCommand({
+			id: "check-recipe-vocabulary",
+			name: "Check recipe technique tags",
+			callback: () =>
+				new VocabularyCheckModal(this.app, {
+					recipes: () => get(this.recipeStores.recipes),
+					vocab: () => this.vocabulary,
+				}).open(),
+		});
+
 		this.addRibbonIcon("utensils", "Cookbook", () => {
 			new SvelteModalWrapper(this.app, CookbookRibbonModal, {
 				openRecipeModal: () => this.openRecipesModal(),
 				generateShoppingList: () => this.generateShoppingList(),
+				createCookSession: (markCookSoon: boolean) => this.createCookSession(markCookSoon),
 				refreshRecipes: () => this.refreshRecipes(),
 				stores: this.recipeStores,
 				app: this.app,
 				cookSoonProp: this.settings.cookSoonProp,
+				cookTogetherProp: this.settings.cookTogetherProp,
 			}).open();
 		});
 
@@ -126,6 +152,10 @@ export default class CookbookPlugin extends Plugin {
 				this.settings.ignorePaths,
 				this.settings.recipesFolder,
 				this.settings.recipesTag,
+				{
+					cookTogetherProp: this.settings.cookTogetherProp,
+					techniqueTagPrefix: this.settings.techniqueTagPrefix,
+				},
 			);
 			this.recipeStores.recipes.update((current: Recipe[]) => {
 				const multipliers = new Map(current.map((r) => [r.path, r.cook_multiplier]));
@@ -143,8 +173,14 @@ export default class CookbookPlugin extends Plugin {
 			ingredientCache: this.ingredientCache,
 			propsToShow: this.settings.propsToShow,
 			cookSoonProp: this.settings.cookSoonProp,
+			cookTogetherProp: this.settings.cookTogetherProp,
 			coverProp: this.settings.coverProp,
 			ingredientGroups: this.settings.ingredientGroups,
+			overlap: {
+				vocab: this.vocabulary,
+				categories: this.settings.shoppingCategories,
+				ignoreCategories: this.settings.overlapIgnoreCategories,
+			},
 		}).open();
 	}
 
@@ -167,6 +203,7 @@ export default class CookbookPlugin extends Plugin {
 					preferredWeightUnit: this.settings.preferredWeightUnit,
 				},
 				existingOrder: route,
+				vocab: this.vocabulary,
 			},
 		);
 
@@ -177,6 +214,59 @@ export default class CookbookPlugin extends Plugin {
 		this.recipeStores.shoppingList.set(list);
 		await this.saveShoppingList(list);
 		await this.openShoppingListView();
+	}
+
+	/** Every distinct ingredient in the recipe library, for the aliases panel. */
+	async ingredientNames(): Promise<IngredientName[]> {
+		await this.refreshRecipes();
+		const recipes = get(this.recipeStores.recipes);
+		const byRecipe = await Promise.all(
+			recipes.map(
+				async (r): Promise<[string, ParsedIngredient[]]> => [
+					r.title,
+					await this.ingredientCache.get(this.app, r),
+				],
+			),
+		);
+		return indexIngredientNames(byRecipe, this.vocabulary);
+	}
+
+	// ─── Cook sessions ───────────────────────────────────────────────────────
+
+	/**
+	 * Write today's session note for the cook-together recipes and open it.
+	 * Optionally marks them cook-soon too, so the shopping list follows.
+	 */
+	async createCookSession(markCookSoon: boolean): Promise<void> {
+		await this.refreshRecipes();
+		const recipes = get(this.recipeStores.cookTogetherRecipes);
+		if (recipes.length === 0) {
+			new Notice("No recipes are marked cook together.");
+			return;
+		}
+		if (markCookSoon) {
+			applySetCookSoon(
+				this.recipeStores.recipes,
+				recipes.map((r) => r.path),
+				this.app,
+				this.settings.cookSoonProp,
+			);
+		}
+		try {
+			const file = await writeCookSession(this.app, recipes, {
+				folder: this.settings.cookSessionFolder,
+				vocab: this.vocabulary,
+				cache: this.ingredientCache,
+				unitPrefs: {
+					preferredVolumeUnit: this.settings.preferredVolumeUnit,
+					preferredWeightUnit: this.settings.preferredWeightUnit,
+				},
+			});
+			await this.app.workspace.getLeaf("tab").openFile(file);
+		} catch (e) {
+			console.error("cookbook: failed to write cook session", e);
+			new Notice("Could not write the cook session note. See the console for details.");
+		}
 	}
 
 	/** Pick up checkbox edits the user made directly in the shopping list note. */
@@ -231,6 +321,7 @@ export default class CookbookPlugin extends Plugin {
 
 	async loadSettings(): Promise<void> {
 		this.settings = mergeSettings(((await this.loadData()) ?? {}) as Record<string, unknown>);
+		this.vocabulary = new Vocabulary(this.settings);
 	}
 
 	saveSettings(): Promise<void> {
@@ -238,6 +329,7 @@ export default class CookbookPlugin extends Plugin {
 			const existing = ((await this.loadData()) ?? {}) as Record<string, unknown>;
 			await this.saveData({ ...existing, ...this.settings });
 			this.recipeStores.hideCheckedItems.set(this.settings.hideCheckedItems);
+			this.vocabulary = new Vocabulary(this.settings);
 		});
 	}
 }

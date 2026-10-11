@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import { Vocabulary } from "../vocab/vocabulary";
+import { DEFAULT_SETTINGS } from "../settings/defaults";
 import {
 	buildFilterOptions,
 	initialFilterFor,
@@ -277,5 +279,21 @@ describe("recipeMatchesFilters — group exclusions", () => {
 	it("does not flag a recipe whose only 'butter' is peanut butter", () => {
 		const ctx = withIngredients("2 tbsp peanut butter", "jam");
 		expect(recipeMatchesFilters(recipe("a.md"), hasDairy, ctx)).toBe(false);
+	});
+});
+
+describe("recipeMatchesFilters — ingredient aliases", () => {
+	it("finds a recipe by any of an ingredient's names", () => {
+		const recipe = { path: "a.md", cook_soon: false, cook_multiplier: 1, title: "a", __tags: [] };
+		const ctx = {
+			ingredientsByPath: new Map([["a.md", [{ quantity: 2, unit: null, text: "green onions" }]]]),
+			ingredientGroups: [],
+			vocab: new Vocabulary(DEFAULT_SETTINGS),
+		};
+		const filters = new Map([
+			["__has-ingredient", { type: "has-ingredient" as const, ingredients: ["scallion"], logic: "and" as const }],
+		]);
+		expect(recipeMatchesFilters(recipe, filters, ctx)).toBe(true);
+		expect(recipeMatchesFilters(recipe, filters, { ...ctx, vocab: undefined })).toBe(false);
 	});
 });

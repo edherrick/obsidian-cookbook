@@ -16,6 +16,10 @@ An [Obsidian](https://obsidian.md) plugin to browse your recipe notes, filter th
 - **Store aisle maps** — save a route per shop and the list sorts itself into that order; drag categories once and it sticks
 - **Drag to reorder** — rearrange shopping list categories by dragging
 - **Recipe detail** — click any recipe card to read the full note rendered inside Obsidian
+- **Technique tags** — tag prep on ingredient lines (`#prep/dice`, `#prep/mince`); a check command finds typos and untagged prep
+- **Ingredient aliases** — tell the cookbook that `green onion` and `scallion` are one ingredient; a names panel suggests likely duplicates to merge
+- **Cooks well with** — the recipe detail lists the recipes that share the most distinctive ingredients, and the browser can sort by overlap with your cook-together set
+- **Cooking sessions** — mark recipes *cook together* and generate one note with the combined equipment, a prep list grouped by technique, every recipe's steps in oven order, and store/reheat instructions
 
 ## How It Works
 
@@ -93,6 +97,44 @@ A trailing comma clause is also read as preparation when it begins with a prepar
 ```
 
 Commas that are simply part of the name are left alone — `1 1/2 lbs boneless, skinless chicken breasts` keeps its full name.
+
+Alternatives belong in parentheses: everything from ` or ` onward is dropped when matching, so write `chicken broth (or vegetable broth)` rather than `chicken or vegetable broth`, which would match as chicken.
+
+#### Technique tags
+
+Tag the prep a line needs with `#prep/<technique>`. Tags can go anywhere on the line; they are lifted off before parsing and shown as part of the prep note.
+
+```text
+- [ ] 2 cups butternut squash | #prep/peel #prep/dice small   →  butternut squash  + note "peel, dice · small"
+- [ ] 1 medium shallot | #prep/mince                          →  medium shallot    + note "mince"
+```
+
+Techniques are a fixed list in settings (peel, halve, seed, quarter, dice, chop, mince, slice, shred, grate, zest, juice, rinse by default), in the order prep is done. Each one also lists the words that mean it, so an untagged `4 garlic cloves, minced` still counts as mince. Run **Check recipe technique tags** to find unknown tags (usually typos) and untagged prep; untagged lines can be fixed with one click.
+
+Because they are ordinary Obsidian tags, selecting `#prep/dice` searches every recipe that dices something, and the browser offers a `technique` filter.
+
+#### Ingredient aliases
+
+Settings → **Ingredient aliases** maps other names onto one canonical name (`scallion` ← `green onion`, `spring onion`). Aliased lines merge on the shopping list, count as overlap and match ingredient filters by any of their names. Matching is exact (after normalisation and ignoring plurals), so an alias never swallows a longer name like `green onion dip`.
+
+**Scan ingredient names** lists every ingredient in your library with how many recipes use it and suggests likely duplicates — `apple` / `red apple`, `ceasar` / `caesar`. **Merge into…** adds the name as an alias.
+
+#### Cooks well with
+
+Two recipes overlap on the distinctive ingredients they share. Staples (salt, oil, dried herbs…) and the Pantry and Baking & Spices aisles are ignored, since they say nothing about shopping or prepping together; both lists are editable in settings. The recipe detail shows the top three matches with the shared ingredients, and **Sort → Overlap with cook-together set** in the browser puts the recipes that best extend your current session first.
+
+#### Cooking sessions
+
+Tick **cook together** on recipes you want to batch-cook (frontmatter `cook-together: true`; separate from cook-soon). **Start cooking session** in the ribbon menu, or the command, writes `Cook session YYYY-MM-DD.md` in the session folder:
+
+- **Recipes** — with timings and how long each keeps
+- **Equipment** — the combined `equipment` lists
+- **Prep list** — one section per technique in prep order, each ingredient merged across recipes with a per-recipe breakdown, so all the peeling happens before all the dicing
+- **Cook order** — recipes grouped by `oven-temp` (lowest first, stovetop last), longest `cook-time` first, each with its steps
+- **Store and reheat** — from each recipe's `## Store it` and `## Reheat it` sections
+- **My notes** — yours; kept when the session is regenerated
+
+The ribbon option *Also mark them cook soon* sends the same recipes to the shopping list. Optional recipe properties used here: `oven-temp`, `equipment`, `fridge-days`, `freezer-months`, `prep-time`, `cook-time`, `serving-size`.
 
 #### Serving multiplier
 
@@ -183,6 +225,8 @@ Groups are fully editable in settings — rename them, add keywords, or create y
 | --- | --- |
 | **Browse recipes** | Opens the recipe browser |
 | **Open shopping list** | Opens the shopping list sidebar panel |
+| **Start cooking session** | Writes today's session note for the cook-together recipes |
+| **Check recipe technique tags** | Lists unknown technique tags and untagged prep |
 
 ## Settings
 
@@ -243,6 +287,22 @@ Reorder categories in the shopping list — by dragging, or with the ▲/▼ but
 With more than one layout defined, a picker appears in the shopping list header. Switching re-sorts the current list into that shop's route. Add, rename, duplicate and delete layouts in settings; **Duplicate** is the quick way to start a new shop from a route you already walk.
 
 Layouts reference categories by name, so a category a layout does not mention simply falls to the bottom of the list.
+
+### Cooking sessions
+
+The cook-together property (default `cook-together`) and the folder session notes are written to (default `recipes/cook sessions`).
+
+### Prep techniques
+
+The technique tag prefix (default `prep`) and the ordered technique list. Order is prep order; keywords are the untagged words that count as the technique.
+
+### Ingredient aliases
+
+Canonical names and the other names they absorb, plus the ingredient names panel.
+
+### Overlap
+
+Staple ingredients and ignored aisles, both left out of overlap scoring.
 
 ## Installation
 

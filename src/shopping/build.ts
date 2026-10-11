@@ -8,6 +8,7 @@ import type { DisplayUnitPrefs } from "../ingredients/aggregate";
 import { roundQty } from "../ingredients/units";
 import { parseChecklistItems } from "../ingredients/parse";
 import type { ParsedIngredient } from "../ingredients/parse";
+import type { Vocabulary } from "../vocab/vocabulary";
 
 export interface BuildShoppingListOptions {
 	cache?: IngredientCache;
@@ -17,6 +18,8 @@ export interface BuildShoppingListOptions {
 	 * falling back to whatever order the previous list was arranged into.
 	 */
 	existingOrder?: string[];
+	/** Aliases decide which lines are the same ingredient, and its aisle. */
+	vocab?: Vocabulary;
 }
 
 /**
@@ -63,7 +66,10 @@ export async function buildShoppingList(
 					quantity: parsed.quantity !== null ? roundQty(parsed.quantity * multiplier) : null,
 					unit: parsed.unit,
 					checked: false,
-					category: assignCategory(parsed.text, categories),
+					category: assignCategory(
+						options.vocab?.canonicalText(parsed.text) ?? parsed.text,
+						categories,
+					),
 					source: "recipe" as const,
 					recipeTitle: recipe.title,
 					prep: parsed.prep,
@@ -79,7 +85,11 @@ export async function buildShoppingList(
 	const items = perRecipeItems.flat().map((item, i) => ({ ...item, id: String(i) }));
 
 	return {
-		items: aggregateItems(items, options.unitPrefs),
+		items: aggregateItems(
+			items,
+			options.unitPrefs,
+			options.vocab ? (t) => options.vocab!.ingredientKey(t) : undefined,
+		),
 		categoryOrder: mergeCategoryOrder(options.existingOrder ?? [], categories),
 		generatedAt: Date.now(),
 	};

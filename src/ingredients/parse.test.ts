@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseChecklistItems, parseIngredient } from "./parse";
+import { parseChecklistItems, parseIngredient, writtenPrep } from "./parse";
 
 describe("parseIngredient", () => {
 	it("parses integer + unit + text", () => {
@@ -183,4 +183,50 @@ describe("parseIngredient — prep verbs seen in real notes", () => {
 			expect(parsed.prep).toBe(prep);
 		});
 	}
+});
+
+describe("parseIngredient — technique tags", () => {
+	it("lifts nested tags out of the prep note", () => {
+		expect(parseIngredient("2 cups butternut squash | #prep/peel #prep/dice small")).toEqual({
+			quantity: 2,
+			unit: "cups",
+			text: "butternut squash",
+			prep: "peel, dice · small",
+			tags: ["prep/peel", "prep/dice"],
+		});
+	});
+
+	it("reads a tag-only prep note", () => {
+		const parsed = parseIngredient("1 medium shallot | #prep/mince");
+		expect(parsed.text).toBe("medium shallot");
+		expect(parsed.prep).toBe("mince");
+		expect(parsed.tags).toEqual(["prep/mince"]);
+	});
+
+	it("finds tags written without a pipe, and still splits a comma prep clause", () => {
+		const parsed = parseIngredient("4 garlic cloves, chopped #prep/chop");
+		expect(parsed.text).toBe("garlic");
+		expect(parsed.prep).toBe("chop · chopped");
+		expect(parsed.tags).toEqual(["prep/chop"]);
+	});
+
+	it("leaves flat hashes alone", () => {
+		expect(parseIngredient("1 #10 can tomatoes").tags).toBeUndefined();
+	});
+});
+
+describe("parseIngredient — wikilinks", () => {
+	it("does not split on the alias pipe inside a wikilink", () => {
+		const parsed = parseIngredient("2 [[Coconut Rice|coconut rice]] | warm");
+		expect(parsed.text).toBe("[[Coconut Rice|coconut rice]]");
+		expect(parsed.prep).toBe("warm");
+	});
+});
+
+describe("writtenPrep", () => {
+	it("drops the technique names that tags contributed", () => {
+		expect(writtenPrep(parseIngredient("2 cups squash | #prep/dice small"))).toBe("small");
+		expect(writtenPrep(parseIngredient("1 shallot | #prep/mince"))).toBeUndefined();
+		expect(writtenPrep(parseIngredient("2 cups flour, sifted"))).toBe("sifted");
+	});
 });
