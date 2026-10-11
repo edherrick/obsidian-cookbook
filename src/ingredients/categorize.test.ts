@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { assignCategory, matchesAnyKeyword, matchKeyword } from "./categorize";
+import { assignCategory, matchesAnyKeyword, matchesGroup, matchKeyword } from "./categorize";
 import { DEFAULT_SETTINGS } from "../settings/defaults";
 
 const CATEGORIES = DEFAULT_SETTINGS.shoppingCategories;
@@ -80,14 +80,18 @@ describe("assignCategory — real recipe lines", () => {
 			"Meat & Fish",
 		],
 		["Rotini", "Pantry"],
+		["horseradish sauce", "Condiments & Sauces"],
+		["toothpaste", "Household & Other"],
+		["white wine", "Drinks"],
+		["sliced prosciutto", "Deli"],
 		["crushed pretzels", "Bakery"],
-		["dried oregano", "Pantry"],
-		["all purpose flour", "Pantry"],
+		["dried oregano", "Baking & Spices"],
+		["all purpose flour", "Baking & Spices"],
 		["chopped cilantro (optional)", "Produce"],
 		["boneless, skinless chicken breasts", "Meat & Fish"],
 		["uncooked jasmine rice", "Pantry"],
 		["large red onion", "Produce"],
-		["vegetable oil", "Pantry"],
+		["vegetable oil", "Condiments & Sauces"],
 	];
 
 	for (const [text, expected] of cases) {
@@ -109,4 +113,94 @@ describe("matchesAnyKeyword", () => {
 	it("is false for an empty ingredient", () => {
 		expect(matchesAnyKeyword("", ["cheese"])).toBe(false);
 	});
+});
+
+// ─── matchesGroup ─────────────────────────────────────────────────────────────
+
+const GROUPS = DEFAULT_SETTINGS.ingredientGroups;
+const group = (name: string) => GROUPS.find((g) => g.name === name)!;
+
+describe("matchesGroup", () => {
+	it("behaves like matchesAnyKeyword when a group has no exclusions", () => {
+		const plain = { name: "Fish", keywords: ["salmon", "cod"] };
+		expect(matchesGroup("wild salmon fillet", plain)).toBe(true);
+		expect(matchesGroup("chicken thigh", plain)).toBe(false);
+	});
+
+	it("still matches the real thing", () => {
+		expect(matchesGroup("2 tbsp butter", group("Dairy"))).toBe(true);
+		expect(matchesGroup("whole milk", group("Dairy"))).toBe(true);
+		expect(matchesGroup("shredded Gruyere cheese", group("Dairy"))).toBe(true);
+		expect(matchesGroup("all purpose flour", group("Gluten"))).toBe(true);
+		expect(matchesGroup("dried pasta", group("Gluten"))).toBe(true);
+	});
+
+	// Each of these registered as a false positive before exclusions existed
+	const notDairy = [
+		"full-fat coconut milk",
+		"coconut cream",
+		"almond milk",
+		"oat milk",
+		"soy milk",
+		"peanut butter",
+		"almond butter",
+		"cocoa butter",
+		"cream of tartar",
+	];
+	for (const text of notDairy) {
+		it(`does not count "${text}" as Dairy`, () => {
+			expect(matchesGroup(text, group("Dairy"))).toBe(false);
+		});
+	}
+
+	const notGluten = ["gluten-free flour", "rice noodles", "almond flour", "buckwheat groats"];
+	for (const text of notGluten) {
+		it(`does not count "${text}" as Gluten`, () => {
+			expect(matchesGroup(text, group("Gluten"))).toBe(false);
+		});
+	}
+
+	it("keeps eggplant out of Eggs and nutmeg out of Tree Nuts", () => {
+		expect(matchesGroup("1 large eggplant", group("Eggs"))).toBe(false);
+		expect(matchesGroup("1/4 tsp nutmeg", group("Tree Nuts"))).toBe(false);
+	});
+
+	it("separates the shellfish allergen from finfish", () => {
+		expect(matchesGroup("king prawns", group("Shellfish"))).toBe(true);
+		expect(matchesGroup("king prawns", group("Fish"))).toBe(false);
+		expect(matchesGroup("salmon fillet", group("Fish"))).toBe(true);
+		expect(matchesGroup("salmon fillet", group("Shellfish"))).toBe(false);
+	});
+
+	it("separates peanuts from tree nuts", () => {
+		expect(matchesGroup("peanut butter", group("Peanuts"))).toBe(true);
+		expect(matchesGroup("peanut butter", group("Tree Nuts"))).toBe(false);
+		expect(matchesGroup("ground almonds", group("Tree Nuts"))).toBe(true);
+		expect(matchesGroup("ground almonds", group("Peanuts"))).toBe(false);
+	});
+
+	it("recognises the soy and sesame groups", () => {
+		expect(matchesGroup("2 tbsp soy sauce", group("Soy"))).toBe(true);
+		expect(matchesGroup("1 tbsp tahini", group("Sesame"))).toBe(true);
+	});
+});
+
+describe("assignCategory — aisle keywords must not outrank the ingredient", () => {
+	const cases: [string, string][] = [
+		// "juice" as a Drinks keyword used to pull citrus out of Produce
+		["Juice and zest of 1 lime", "Produce"],
+		["2 tbsp lemon juice", "Produce"],
+		["1 cup orange juice", "Drinks"],
+		// "soda" must not swallow baking soda
+		["1 tsp baking soda", "Baking & Spices"],
+		["1 can soda", "Drinks"],
+		// horseradish is a condiment, but not when it describes a cheese
+		["shredded horseradish flavor Cheddar cheese", "Dairy & Eggs"],
+		["2 tbsp horseradish sauce", "Condiments & Sauces"],
+	];
+	for (const [text, expected] of cases) {
+		it(`puts "${text}" in ${expected}`, () => {
+			expect(assignCategory(text, CATEGORIES)).toBe(expected);
+		});
+	}
 });

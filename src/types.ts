@@ -31,4 +31,25 @@ export interface KeywordGroup {
 export type ShoppingCategory = KeywordGroup;
 
 /** A dietary group for filtering recipes. A recipe may match several at once. */
-export type IngredientGroup = KeywordGroup;
+export interface IngredientGroup extends KeywordGroup {
+	/**
+	 * Terms that look like a match but are not one.
+	 *
+	 * Categories arbitrate by keyword specificity because they compete for an
+	 * item; groups do not compete, so nothing can outrank a short keyword. This
+	 * is how "coconut milk" stops counting as Dairy and "rice noodles" stops
+	 * counting as Gluten.
+	 */
+	excludeKeywords?: string[];
+}
+
+/**
+ * A route through one shop: the order its aisles are walked in.
+ *
+ * Only the ordering varies between shops — what an ingredient *is* does not —
+ * so a layout references categories by name rather than redefining them.
+ */
+export interface StoreLayout {
+	name: string;
+	aisleOrder: string[];
+}

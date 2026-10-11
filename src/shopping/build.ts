@@ -12,7 +12,10 @@ import type { ParsedIngredient } from "../ingredients/parse";
 export interface BuildShoppingListOptions {
 	cache?: IngredientCache;
 	unitPrefs?: DisplayUnitPrefs;
-	/** The order the user has already arranged categories into, if any. */
+	/**
+	 * The route to lay the list out in — the active store layout's aisle order,
+	 * falling back to whatever order the previous list was arranged into.
+	 */
 	existingOrder?: string[];
 }
 

@@ -168,3 +168,14 @@
 	flex: 1;
 	font-size: 0.88em;
 }
+
+.cookbook-cat-excludes {
+	flex: 1;
+	min-width: 140px;
+}
+
+.cookbook-store-summary {
+	font-size: 0.85em;
+	color: var(--text-muted);
+	white-space: nowrap;
+}

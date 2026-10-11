@@ -2,28 +2,30 @@ import { ItemView, WorkspaceLeaf } from "obsidian";
 import { mount, unmount } from "svelte";
 import ShoppingListView from "./ShoppingListView.svelte";
 import type { RecipeStores } from "../../recipes/recipeStores";
-import type { PersistedShoppingList, ShoppingCategory } from "../../types";
+import type { PersistedShoppingList, ShoppingCategory, StoreLayout } from "../../types";
 
 export const VIEW_TYPE_SHOPPING = "cookbook-shopping";
 
+/** Everything the shopping list view needs from the plugin. */
+export interface ShoppingViewDeps {
+	saveShoppingList: (data: PersistedShoppingList) => Promise<void>;
+	getShoppingCategories: () => ShoppingCategory[];
+	getStoreLayouts: () => StoreLayout[];
+	getActiveStoreLayout: () => string | undefined;
+	/** Persist a reordered route into the active store layout. */
+	onReorder: (aisleOrder: string[]) => Promise<void>;
+	onSelectStore: (name: string) => Promise<void>;
+}
+
 export class CookbookShoppingView extends ItemView {
 	private component: Record<string, unknown> | null = null;
-	private readonly stores: RecipeStores;
-	private readonly persistShoppingList: (
-		data: PersistedShoppingList,
-	) => Promise<void>;
-	private readonly getShoppingCategories: () => ShoppingCategory[];
 
 	constructor(
 		leaf: WorkspaceLeaf,
-		stores: RecipeStores,
-		persistShoppingList: (data: PersistedShoppingList) => Promise<void>,
-		getShoppingCategories: () => ShoppingCategory[],
+		private readonly stores: RecipeStores,
+		private readonly deps: ShoppingViewDeps,
 	) {
 		super(leaf);
-		this.stores = stores;
-		this.persistShoppingList = persistShoppingList;
-		this.getShoppingCategories = getShoppingCategories;
 	}
 
 	getViewType(): string {
@@ -42,11 +44,7 @@ export class CookbookShoppingView extends ItemView {
 		this.contentEl.empty();
 		this.component = mount(ShoppingListView, {
 			target: this.contentEl,
-			props: {
-				stores: this.stores,
-				saveShoppingList: this.persistShoppingList,
-				getShoppingCategories: this.getShoppingCategories,
-			},
+			props: { stores: this.stores, ...this.deps },
 		}) as Record<string, unknown>;
 	}
 

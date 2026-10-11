@@ -1,7 +1,7 @@
 import type { Recipe } from "../recipes/repository";
 import type { ParsedIngredient } from "../ingredients/parse";
 import type { IngredientGroup } from "../types";
-import { matchesAnyKeyword } from "../ingredients/categorize";
+import { matchesGroup } from "../ingredients/categorize";
 
 export const HAS_INGREDIENT_KEY = "__has-ingredient";
 export const EXCLUDES_INGREDIENT_KEY = "__excludes-ingredient";
@@ -104,7 +104,7 @@ function recipeHasGroup(recipe: Recipe, groupName: string, ctx: FilterContext): 
 	const group = ctx.ingredientGroups.find((g) => g.name === groupName);
 	if (!group) return false;
 	const ingredients = ctx.ingredientsByPath.get(recipe.path) ?? [];
-	return ingredients.some((i) => matchesAnyKeyword(i.text, group.keywords));
+	return ingredients.some((i) => matchesGroup(i.text, group));
 }
 
 export function recipeMatchesFilters(

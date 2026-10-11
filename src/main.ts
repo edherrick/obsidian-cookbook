@@ -14,8 +14,9 @@ import { createRecipeStores } from "./recipes/recipeStores";
 import type { RecipeStores } from "./recipes/recipeStores";
 import { IngredientCache } from "./ingredients/cache";
 import { buildShoppingList } from "./shopping/build";
+import { UNCATEGORIZED } from "./ingredients/categorize";
 import { ShoppingListPersistence } from "./shopping/persistence";
-import type { PersistedShoppingList } from "./types";
+import type { PersistedShoppingList, StoreLayout } from "./types";
 
 /** Frontmatter edits arrive in bursts; rescanning once per burst is enough. */
 const RECIPE_REFRESH_DEBOUNCE_MS = 500;
@@ -61,12 +62,14 @@ export default class CookbookPlugin extends Plugin {
 		this.registerView(
 			VIEW_TYPE_SHOPPING,
 			(leaf: WorkspaceLeaf) =>
-				new CookbookShoppingView(
-					leaf,
-					this.recipeStores,
-					(data) => this.saveShoppingList(data),
-					() => this.settings.shoppingCategories,
-				),
+				new CookbookShoppingView(leaf, this.recipeStores, {
+					saveShoppingList: (data) => this.saveShoppingList(data),
+					getShoppingCategories: () => this.settings.shoppingCategories,
+					getStoreLayouts: () => this.settings.storeLayouts,
+					getActiveStoreLayout: () => this.settings.activeStoreLayout,
+					onReorder: (aisleOrder) => this.saveAisleOrder(aisleOrder),
+					onSelectStore: (name) => this.selectStoreLayout(name),
+				}),
 		);
 
 		this.addCommand({
@@ -152,6 +155,7 @@ export default class CookbookPlugin extends Plugin {
 		// persists reorders and check-offs straight to disk, so the store can be
 		// behind, and a stale read here would undo a hand-sorted category order.
 		const existing = (await this.shoppingList.load()) ?? get(this.recipeStores.shoppingList);
+		const route = this.activeLayout()?.aisleOrder ?? existing?.categoryOrder ?? [];
 		const list = await buildShoppingList(
 			this.app,
 			get(this.recipeStores.recipes),
@@ -162,7 +166,7 @@ export default class CookbookPlugin extends Plugin {
 					preferredVolumeUnit: this.settings.preferredVolumeUnit,
 					preferredWeightUnit: this.settings.preferredWeightUnit,
 				},
-				existingOrder: existing?.categoryOrder ?? [],
+				existingOrder: route,
 			},
 		);
 
@@ -198,6 +202,29 @@ export default class CookbookPlugin extends Plugin {
 
 	saveShoppingList(data: PersistedShoppingList): Promise<void> {
 		return this.shoppingList.save(data);
+	}
+
+	// ─── Store layouts ───────────────────────────────────────────────────────
+
+	private activeLayout(): StoreLayout | undefined {
+		const { storeLayouts, activeStoreLayout } = this.settings;
+		return storeLayouts.find((l) => l.name === activeStoreLayout) ?? storeLayouts[0];
+	}
+
+	/**
+	 * Remember a reordered route. Dragging categories in the shopping list is
+	 * how a layout is edited, so the order is learned once and reused.
+	 */
+	private async saveAisleOrder(aisleOrder: string[]): Promise<void> {
+		const layout = this.activeLayout();
+		if (!layout) return;
+		layout.aisleOrder = aisleOrder.filter((c) => c !== UNCATEGORIZED);
+		await this.saveSettings();
+	}
+
+	private async selectStoreLayout(name: string): Promise<void> {
+		this.settings.activeStoreLayout = name;
+		await this.saveSettings();
 	}
 
 	// ─── Settings ────────────────────────────────────────────────────────────

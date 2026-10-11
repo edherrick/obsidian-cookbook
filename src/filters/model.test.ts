@@ -231,3 +231,51 @@ describe("initialFilterFor", () => {
 		});
 	});
 });
+
+describe("recipeMatchesFilters — group exclusions", () => {
+	const dietary: FilterContext["ingredientGroups"] = [
+		{
+			name: "Dairy",
+			keywords: ["milk", "butter", "cream"],
+			excludeKeywords: ["coconut milk", "peanut butter"],
+		},
+	];
+
+	function withIngredients(...texts: string[]): FilterContext {
+		return {
+			ingredientsByPath: new Map([["a.md", ingredients(...texts)]]),
+			ingredientGroups: dietary,
+		};
+	}
+
+	const hasDairy = new Map<string, FilterValue>([
+		[HAS_GROUP_KEY, { type: "has-group", groups: ["Dairy"], logic: "or" }],
+	]);
+	const noDairy = new Map<string, FilterValue>([
+		["__excludes-group", { type: "excludes-group", groups: ["Dairy"] }],
+	]);
+
+	it("does not flag a recipe whose only 'dairy' is coconut milk", () => {
+		// Coconut Rice was being hidden by an exclude-Dairy filter
+		const ctx = withIngredients("1 (14-ounce) can full-fat coconut milk", "jasmine rice");
+		expect(recipeMatchesFilters(recipe("a.md"), hasDairy, ctx)).toBe(false);
+		expect(recipeMatchesFilters(recipe("a.md"), noDairy, ctx)).toBe(true);
+	});
+
+	it("still flags a recipe containing real dairy", () => {
+		const ctx = withIngredients("2 cups whole milk");
+		expect(recipeMatchesFilters(recipe("a.md"), hasDairy, ctx)).toBe(true);
+		expect(recipeMatchesFilters(recipe("a.md"), noDairy, ctx)).toBe(false);
+	});
+
+	it("flags a recipe with both peanut butter and real butter", () => {
+		// Exclusions apply per ingredient line, so the real butter still counts
+		const ctx = withIngredients("2 tbsp peanut butter", "6 tbsp butter");
+		expect(recipeMatchesFilters(recipe("a.md"), hasDairy, ctx)).toBe(true);
+	});
+
+	it("does not flag a recipe whose only 'butter' is peanut butter", () => {
+		const ctx = withIngredients("2 tbsp peanut butter", "jam");
+		expect(recipeMatchesFilters(recipe("a.md"), hasDairy, ctx)).toBe(false);
+	});
+});

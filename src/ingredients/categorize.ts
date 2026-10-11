@@ -1,4 +1,4 @@
-import type { ShoppingCategory } from "../types";
+import type { IngredientGroup, ShoppingCategory } from "../types";
 import { normalizeIngredientName } from "./normalize";
 
 export const UNCATEGORIZED = "Uncategorized";
@@ -60,9 +60,23 @@ export function assignCategory(text: string, categories: ShoppingCategory[]): st
 	return bestName;
 }
 
-/** Does any of the group's keywords describe this ingredient? */
+/** Does any of these keywords describe this ingredient? */
 export function matchesAnyKeyword(text: string, keywords: string[]): boolean {
 	const key = normalizeIngredientName(text);
 	if (!key) return false;
 	return keywords.some((kw) => matchKeyword(key, kw));
+}
+
+/**
+ * Does this ingredient belong to a dietary group?
+ *
+ * A keyword must match and no exclusion may. Because this runs per ingredient
+ * line, a plain "any exclusion wins" rule is correct: a recipe listing both
+ * "peanut butter" and "2 tbsp butter" still reads as Dairy via the second line.
+ */
+export function matchesGroup(text: string, group: IngredientGroup): boolean {
+	const key = normalizeIngredientName(text);
+	if (!key) return false;
+	if (!group.keywords.some((kw) => matchKeyword(key, kw))) return false;
+	return !group.excludeKeywords?.some((kw) => matchKeyword(key, kw));
 }

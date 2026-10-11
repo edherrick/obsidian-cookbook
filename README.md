@@ -13,6 +13,7 @@ An [Obsidian](https://obsidian.md) plugin to browse your recipe notes, filter th
 - **Shopping list** — generate a categorised, grouped shopping list from your cook-soon recipes
 - **Smart ingredient parsing** — quantities, units, and fractions are extracted automatically; ingredients are aggregated across recipes with unit-aware conversion
 - **Custom items** — add one-off items to the shopping list manually; items are auto-categorised by keyword
+- **Store aisle maps** — save a route per shop and the list sorts itself into that order; drag categories once and it sticks
 - **Drag to reorder** — rearrange shopping list categories by dragging
 - **Recipe detail** — click any recipe card to read the full note rendered inside Obsidian
 
@@ -131,10 +132,27 @@ The recipe browser supports multiple filter types that can be combined:
 | --- | --- |
 | Dairy | milk, butter, cream, cheese, yogurt… |
 | Meat & Poultry | chicken, beef, pork, bacon, lamb… |
-| Fish & Seafood | salmon, tuna, shrimp, cod, prawn… |
-| Eggs | egg, eggs |
-| Nuts | almond, walnut, cashew, peanut… |
+| Fish | salmon, tuna, cod, anchovy, haddock… |
+| Shellfish | shrimp, prawn, crab, mussel, scallop… |
+| Eggs | egg, egg white, mayonnaise, meringue |
+| Tree Nuts | almond, walnut, cashew, pistachio… |
+| Peanuts | peanut, peanut butter, satay… |
+| Soy | soy sauce, tofu, tempeh, edamame, miso… |
+| Sesame | sesame, tahini, sesame oil, halva… |
 | Gluten | flour, wheat, bread, pasta, barley… |
+
+Fish and shellfish are separate groups, as are tree nuts and peanuts — they are distinct allergens, and someone reacting to shrimp can still eat salmon.
+
+#### Exclusions
+
+Each group also has an **exclusion list** for terms that look like a match but are not one. Without it, a bare `milk` keyword would drag `coconut milk`, `oat milk` and `almond milk` into Dairy, and `noodle` would put `rice noodles` in Gluten.
+
+```
+Dairy   keywords   milk, butter, cream, cheese…
+        excludes   coconut milk, almond milk, peanut butter, cream of tartar…
+```
+
+Exclusions are checked per ingredient line, so a recipe listing both `peanut butter` and `6 tbsp butter` still counts as Dairy — via the second line.
 
 Groups are fully editable in settings — rename them, add keywords, or create your own. You can also use frontmatter flags on individual recipes (e.g. `isVegan: true`) and filter on those directly using the frontmatter filter.
 
@@ -208,13 +226,23 @@ Named groups of ingredient keywords used by the dietary group filters in the rec
 
 Keyword-based categories that group items on the shopping list. When a list is generated, each ingredient is matched against your category keywords and grouped accordingly. Unmatched items go to **Uncategorized**.
 
-Default categories: Produce, Dairy & Eggs, Meat & Fish, Pantry, Frozen, Bakery.
+Default categories, in default walking order: Produce, Bakery, Deli, Meat & Fish, Dairy & Eggs, Pantry, Baking & Spices, Condiments & Sauces, Drinks, Frozen, Household & Other. **Household & Other** catches non-food items you add by hand, such as toothpaste.
 
 You can add, remove, reorder, and edit categories and their keywords from the settings tab, and **Restore defaults** puts the shipped set back.
 
 Keywords match whole words, so `pea` will not match `peanut butter`. Compound names need their own keyword — the defaults list `blueberries` separately from `berries` for exactly this reason.
 
-The order you arrange categories into on the shopping list itself is yours: it is remembered and survives regenerating the list.
+The order you arrange categories into on the shopping list is stored against a **store layout** — see below.
+
+### Store layouts
+
+A store layout is a **route**: the order one shop's aisles are walked in. Categories say *what* an ingredient is; a layout says *where it is in this particular shop*.
+
+Reorder categories in the shopping list — by dragging, or with the ▲/▼ buttons — and the new order is saved into the active layout. Learn the route once and every future list comes out in that order.
+
+With more than one layout defined, a picker appears in the shopping list header. Switching re-sorts the current list into that shop's route. Add, rename, duplicate and delete layouts in settings; **Duplicate** is the quick way to start a new shop from a route you already walk.
+
+Layouts reference categories by name, so a category a layout does not mention simply falls to the bottom of the list.
 
 ## Installation
 

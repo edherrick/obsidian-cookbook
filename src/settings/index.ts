@@ -1,4 +1,4 @@
-import type { ShoppingCategory, IngredientGroup } from "../types";
+import type { ShoppingCategory, IngredientGroup, StoreLayout } from "../types";
 import { DEFAULT_SETTINGS } from "./defaults";
 
 export interface CookbookSettings {
@@ -14,6 +14,9 @@ export interface CookbookSettings {
 	hideCheckedItems: boolean;
 	ingredientGroups: IngredientGroup[];
 	shoppingListFilePath?: string;
+	/** One route per shop; the active one orders the shopping list. */
+	storeLayouts: StoreLayout[];
+	activeStoreLayout?: string;
 }
 
 export { DEFAULT_SETTINGS };
@@ -31,10 +34,15 @@ export function cloneDefaultSettings(): CookbookSettings {
 		ingredientGroups: DEFAULT_SETTINGS.ingredientGroups.map((g) => ({
 			...g,
 			keywords: [...g.keywords],
+			...(g.excludeKeywords ? { excludeKeywords: [...g.excludeKeywords] } : {}),
 		})),
 		shoppingCategories: DEFAULT_SETTINGS.shoppingCategories.map((c) => ({
 			...c,
 			keywords: [...c.keywords],
+		})),
+		storeLayouts: DEFAULT_SETTINGS.storeLayouts.map((l) => ({
+			...l,
+			aisleOrder: [...l.aisleOrder],
 		})),
 	};
 }

@@ -1,7 +1,7 @@
 import { App, PluginSettingTab, Setting, debounce, setIcon } from "obsidian";
 import type CookbookPlugin from "../main";
 import { PathSuggest } from "../utils/suggesters/PathSuggest";
-import type { KeywordGroup } from "../types";
+import type { IngredientGroup, KeywordGroup, StoreLayout } from "../types";
 import { cloneDefaultSettings } from "./index";
 
 /** Keystrokes shouldn't each cost a disk read + write. */
@@ -21,7 +21,13 @@ export class CookbookSettingTab extends PluginSettingTab {
 	private renderCategoryEditor(
 		container: HTMLElement,
 		getItems: () => KeywordGroup[],
-		options: { namePlaceholder: string; addLabel: string; reorderable?: boolean },
+		options: {
+			namePlaceholder: string;
+			addLabel: string;
+			reorderable?: boolean;
+			/** Dietary groups only: a second list of terms that must NOT match. */
+			excludable?: boolean;
+		},
 	): void {
 		container.empty();
 		const items = getItems();
@@ -59,6 +65,26 @@ export class CookbookSettingTab extends PluginSettingTab {
 					.filter((s) => s.length > 0);
 				this.saveDebounced();
 			});
+
+			if (options.excludable) {
+				const group = item as IngredientGroup;
+				const exInput = fields.createEl("input", { type: "text" });
+				exInput.className = "cookbook-cat-excludes";
+				// eslint-disable-next-line obsidianmd/ui/sentence-case
+				exInput.placeholder = "Not, e.g. coconut milk";
+				exInput.title =
+					"Terms that look like a match but are not, such as coconut milk in the dairy group";
+				exInput.value = group.excludeKeywords?.join(", ") ?? "";
+				exInput.addEventListener("input", () => {
+					const parsed = exInput.value
+						.split(",")
+						.map((s) => s.trim())
+						.filter((s) => s.length > 0);
+					(items[idx] as IngredientGroup).excludeKeywords =
+						parsed.length > 0 ? parsed : undefined;
+					this.saveDebounced();
+				});
+			}
 
 			const actions = row.createDiv({ cls: "cookbook-cat-actions" });
 
@@ -318,7 +344,7 @@ export class CookbookSettingTab extends PluginSettingTab {
 		this.renderCategoryEditor(
 			ingredientGroupsContainer,
 			() => this.plugin.settings.ingredientGroups,
-			{ namePlaceholder: "Name (e.g. Dairy)", addLabel: "Add group" },
+			{ namePlaceholder: "Name (e.g. Dairy)", addLabel: "Add group", excludable: true },
 		);
 
 		new Setting(containerEl)
@@ -340,6 +366,99 @@ export class CookbookSettingTab extends PluginSettingTab {
 			categoriesContainer,
 			() => this.plugin.settings.shoppingCategories,
 			{ namePlaceholder: "Name (e.g. Produce)", addLabel: "Add category", reorderable: true },
+		);
+
+		new Setting(containerEl)
+			.setName("Store layouts")
+			.setDesc(
+				"A route through one shop: the order its aisles are walked. Reorder a route by dragging categories in the shopping list itself — switching shops there re-sorts the list.",
+			)
+			.setHeading();
+
+		const storesContainer = containerEl.createDiv();
+		this.renderStoreEditor(storesContainer);
+	}
+
+	private renderStoreEditor(container: HTMLElement): void {
+		container.empty();
+		const { settings } = this.plugin;
+		const rerender = () => this.renderStoreEditor(container);
+
+		new Setting(container).setName("Active store").addDropdown((dd) => {
+			for (const l of settings.storeLayouts) dd.addOption(l.name, l.name);
+			dd.setValue(settings.activeStoreLayout ?? settings.storeLayouts[0]?.name ?? "");
+			dd.onChange((value) => {
+				settings.activeStoreLayout = value;
+				void this.plugin.saveSettings();
+			});
+		});
+
+		settings.storeLayouts.forEach((layout, idx) => {
+			const row = container.createDiv({ cls: "cookbook-cat-row" });
+			const fields = row.createDiv({ cls: "cookbook-cat-fields" });
+
+			const nameInput = fields.createEl("input", { type: "text" });
+			nameInput.className = "cookbook-cat-name";
+			// eslint-disable-next-line obsidianmd/ui/sentence-case
+			nameInput.placeholder = "Name (e.g. Tesco Extra)";
+			nameInput.value = layout.name;
+			nameInput.addEventListener("input", () => {
+				const previous = settings.storeLayouts[idx]!.name;
+				settings.storeLayouts[idx]!.name = nameInput.value;
+				if (settings.activeStoreLayout === previous) {
+					settings.activeStoreLayout = nameInput.value;
+				}
+				this.saveDebounced();
+			});
+
+			fields.createSpan({
+				cls: "cookbook-store-summary",
+				text: `${layout.aisleOrder.length} aisles`,
+			});
+
+			const actions = row.createDiv({ cls: "cookbook-cat-actions" });
+
+			const dup = actions.createEl("button");
+			dup.title = "Duplicate";
+			setIcon(dup, "copy");
+			dup.addEventListener("click", () => {
+				// A new shop is nearly always a tweak of a route you already walk
+				settings.storeLayouts.splice(idx + 1, 0, {
+					name: `${layout.name} copy`,
+					aisleOrder: [...layout.aisleOrder],
+				});
+				void this.plugin.saveSettings();
+				rerender();
+			});
+
+			const del = actions.createEl("button");
+			del.title = "Remove";
+			del.addClass("is-danger");
+			setIcon(del, "trash");
+			del.disabled = settings.storeLayouts.length <= 1;
+			del.addEventListener("click", () => {
+				const [removed] = settings.storeLayouts.splice(idx, 1);
+				if (settings.activeStoreLayout === removed?.name) {
+					settings.activeStoreLayout = settings.storeLayouts[0]?.name;
+				}
+				void this.plugin.saveSettings();
+				rerender();
+			});
+		});
+
+		new Setting(container).addButton((b) =>
+			b
+				.setButtonText("Add store")
+				.setCta()
+				.onClick(() => {
+					const layout: StoreLayout = {
+						name: "New store",
+						aisleOrder: this.plugin.settings.shoppingCategories.map((c) => c.name),
+					};
+					this.plugin.settings.storeLayouts.push(layout);
+					void this.plugin.saveSettings();
+					rerender();
+				}),
 		);
 	}
 }

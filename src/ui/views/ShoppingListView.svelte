@@ -2,14 +2,31 @@
 	import { onDestroy } from "svelte";
 	import { obsidianIcon } from "../../utils/obsidianIcon";
 	import type { RecipeStores } from "../../recipes/recipeStores";
-	import type { PersistedShoppingList, ShoppingItem, ShoppingCategory } from "../../types";
+	import type {
+		PersistedShoppingList,
+		ShoppingItem,
+		ShoppingCategory,
+		StoreLayout,
+	} from "../../types";
 	import { assignCategory } from "../../ingredients/categorize";
 	import { formatQty } from "../../ingredients/units";
 
-	const { stores, saveShoppingList, getShoppingCategories } = $props<{
+	const {
+		stores,
+		saveShoppingList,
+		getShoppingCategories,
+		getStoreLayouts,
+		getActiveStoreLayout,
+		onReorder,
+		onSelectStore,
+	} = $props<{
 		stores: RecipeStores;
 		saveShoppingList: (data: PersistedShoppingList) => Promise<void>;
 		getShoppingCategories: () => ShoppingCategory[];
+		getStoreLayouts: () => StoreLayout[];
+		getActiveStoreLayout: () => string | undefined;
+		onReorder: (aisleOrder: string[]) => Promise<void>;
+		onSelectStore: (name: string) => Promise<void>;
 	}>();
 
 	// ─── Local state ──────────────────────────────────────────────────────────
@@ -23,6 +40,30 @@
 	let dragSource: string | null = $state(null);
 	let dragOver: string | null = $state(null);
 
+	// ─── Store layouts ────────────────────────────────────────────────────────
+	// svelte-ignore state_referenced_locally — accessor props are stable
+	let layouts: StoreLayout[] = $state(getStoreLayouts());
+	// svelte-ignore state_referenced_locally
+	let activeStore = $state(getActiveStoreLayout() ?? getStoreLayouts()[0]?.name ?? "");
+
+	function refreshLayouts() {
+		layouts = getStoreLayouts();
+		activeStore = getActiveStoreLayout() ?? layouts[0]?.name ?? "";
+	}
+
+	/**
+	 * Switch shops. Categories the new route does not mention keep their place
+	 * at the bottom — buildGroups appends anything the order list omits.
+	 */
+	async function selectStore(name: string) {
+		activeStore = name;
+		await onSelectStore(name);
+		const layout = layouts.find((l) => l.name === name);
+		if (!layout) return;
+		categoryOrder = [...layout.aisleOrder];
+		await persist();
+	}
+
 	// ─── Subscribe to store (resets when a new list is generated) ────────────
 	function applyList(list: PersistedShoppingList | null) {
 		if (!list) return;
@@ -30,6 +71,7 @@
 		customItems = list.items.filter((i) => i.source === "custom");
 		categoryOrder = [...list.categoryOrder];
 		generatedAt = list.generatedAt;
+		refreshLayouts();
 	}
 
 	// svelte-ignore state_referenced_locally — stores is a stable reference
@@ -163,7 +205,7 @@
 		order.splice(from, 1);
 		order.splice(to, 0, moved);
 		categoryOrder = order;
-		await persist();
+		await Promise.all([persist(), onReorder(order)]);
 	}
 
 	/**
@@ -215,6 +257,20 @@
 <div class="shopping-list-view">
 	<div class="header">
 		<h3>Shopping List</h3>
+		{#if layouts.length > 1}
+			<label class="sr-only" for="shopping-store-select">Store layout</label>
+			<select
+				id="shopping-store-select"
+				class="store-select"
+				value={activeStore}
+				onchange={(e) => selectStore((e.currentTarget as HTMLSelectElement).value)}
+				title="Order the list by this shop's aisles"
+			>
+				{#each layouts as l (l.name)}
+					<option value={l.name}>{l.name}</option>
+				{/each}
+			</select>
+		{/if}
 		{#if generatedAt}
 			<span class="generated-at"
 				>{new Date(generatedAt).toLocaleDateString()}</span
@@ -344,6 +400,17 @@
 		flex: 1;
 		font-size: 1.1em;
 		font-weight: 600;
+	}
+
+	.store-select {
+		font-size: 0.78em;
+		max-width: 10rem;
+		border-radius: 3px;
+		border: 1px solid var(--background-modifier-border);
+		background: var(--background-primary);
+		color: var(--text-normal);
+		padding: 1px 4px;
+		cursor: pointer;
 	}
 
 	.generated-at {
