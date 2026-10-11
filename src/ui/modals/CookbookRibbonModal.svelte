@@ -127,10 +127,6 @@
 				<input type="checkbox" bind:checked={alsoCookSoon} />
 				Also mark them cook soon (for the shopping list)
 			</label>
-			<button class="btn mod-cta" onclick={handleStartSession} disabled={startingSession}>
-				<span use:obsidianIcon={"chef-hat"} class="btn-icon"></span>
-				<span class="btn-label">{startingSession ? "Writing…" : "Start cooking session"}</span>
-			</button>
 		</div>
 	{/if}
 
@@ -151,6 +147,13 @@
 					: "Generate Shopping List"}</span
 			>
 		</button>
+
+		{#if $cookTogetherRecipes && $cookTogetherRecipes.length > 0}
+			<button class="btn" onclick={handleStartSession} disabled={startingSession}>
+				<span use:obsidianIcon={"chef-hat"} class="btn-icon"></span>
+				<span class="btn-label">{startingSession ? "Writing…" : "Start Cooking Session"}</span>
+			</button>
+		{/if}
 	</div>
 </div>
 
@@ -198,9 +201,9 @@
 		display: flex;
 		align-items: center;
 		gap: 6px;
-		font-size: 0.85em;
+		font-size: var(--font-ui-small);
 		color: var(--text-muted);
-		margin: 0.5rem 0;
+		margin: 0.5rem 0 0;
 	}
 
 	.no-selection {
@@ -211,6 +214,7 @@
 
 	.btn-row {
 		display: flex;
+		flex-wrap: wrap;
 		gap: 0.75rem;
 	}
 
@@ -218,7 +222,8 @@
 		display: flex;
 		align-items: center;
 		gap: 6px;
-		flex: 1;
+		flex: 1 1 0;
+		min-width: max-content;
 		justify-content: center;
 	}
 </style>

@@ -20,3 +20,6 @@ data.json
 
 # Exclude macOS Finder (System Explorer) View States
 .DS_Store
+
+# Built from src/styles.css plus the Svelte component styles.
+styles.css
