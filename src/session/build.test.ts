@@ -171,14 +171,41 @@ describe("buildSessionNote", () => {
 		expect(note.startsWith("---\ntags:\n  - cook-session\ndate: 2026-10-11\n")).toBe(true);
 		expect(note).toContain('  - "[[Soup|Soup]]"');
 		expect(note).toContain("## Equipment\n- [ ] Sheet pan\n- [ ] Large skillet\n- [ ] Oven-safe skillet");
-		expect(note).toContain("### Oven at 350ºF");
-		expect(note).toContain("### Oven at 375ºF");
+		expect(note).toContain('cook-plan:\n  - "Soup.md#1"\n  - "Burritos.md#1"\n  - "Burritos.md#2"\n  - "One-Pan.md#1"');
 		expect(note).toContain("**Store:** Freeze for 3 months.");
 		// The same dot marks a recipe in the key, its steps, and its storage
 		expect(note).toContain("## Recipes\n- 🔴 [[Soup|Soup]]");
-		expect(note).toContain("#### 🟠 [[Burritos|Burritos]]");
+		expect(note).toContain("### 2. 🟠 [[Burritos|Burritos]] · oven 350ºF");
 		expect(note).toContain("### 🟠 Burritos");
 		expect(note.trimEnd().endsWith("## My notes")).toBe(true);
+	});
+
+	it("numbers the default cook order and shows oven and timing once per recipe", () => {
+		const note = buildSessionNote([burritos, onePan, soup], opts);
+		expect(note).toContain("### 1. 🔴 [[Soup|Soup]] · oven 350ºF\n_step 1 of 1 · cook 45 min_");
+		expect(note).toContain("### 3. 🟠 [[Burritos|Burritos]]\n_step 2 of 2_\n\n- [ ] 12 large eggs");
+		expect(note).toContain("### 4. 🟡 [[One-Pan|One-Pan]] · oven 375ºF");
+	});
+
+	it("follows a saved plan, with meanwhile steps under the step before", () => {
+		const plan = [
+			{ ref: "Burritos.md#1", meanwhile: false },
+			{ ref: "Soup.md#1", meanwhile: true },
+			{ ref: "Burritos.md#2", meanwhile: false },
+		];
+		const note = buildSessionNote([burritos, onePan, soup], { ...opts, plan });
+		const order = note.slice(note.indexOf("## Cook order"));
+		expect(order).toContain("### 1. 🟠 [[Burritos|Burritos]] · oven 350ºF");
+		expect(order).toContain("#### ↳ Meanwhile: 🔴 [[Soup|Soup]] · oven 350ºF");
+		expect(order).toContain("### 2. 🟠 [[Burritos|Burritos]]\n_step 2 of 2_");
+		// One-Pan was not in the plan, so it is appended
+		expect(order).toContain("### 3. 🟡 [[One-Pan|One-Pan]]");
+		expect(note).toContain('  - "meanwhile Soup.md#1"');
+	});
+
+	it("links to the arrange modal when given a link", () => {
+		const note = buildSessionNote([soup], { ...opts, arrangeLink: "obsidian://cookbook-arrange?file=x" });
+		expect(note).toContain("> [Arrange the cook order](obsidian://cookbook-arrange?file=x)");
 	});
 
 	it("keeps My notes when regenerated", () => {

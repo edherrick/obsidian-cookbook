@@ -19,7 +19,7 @@ An [Obsidian](https://obsidian.md) plugin to browse your recipe notes, filter th
 - **Technique tags** — tag prep on ingredient lines (`#prep/dice`, `#prep/mince`); a check command finds typos and untagged prep
 - **Ingredient aliases** — tell the cookbook that `green onion` and `scallion` are one ingredient; a names panel suggests likely duplicates to merge
 - **Cooks well with** — the recipe detail lists the recipes that share the most distinctive ingredients, and the browser can sort by overlap with your cook-together set
-- **Cooking sessions** — mark recipes *cook together* and generate one note with the combined equipment, a prep list grouped by technique, every recipe's steps in oven order, and store/reheat instructions
+- **Cooking sessions** — mark recipes *cook together* and generate one note with the combined equipment, a prep list grouped by technique, every recipe's steps in a cook order you can arrange by hand, and store/reheat instructions
 
 ## How It Works
 
@@ -127,12 +127,14 @@ Two recipes overlap on the distinctive ingredients they share. Staples (salt, oi
 
 Tick **cook together** on recipes you want to batch-cook (frontmatter `cook-together: true`; separate from cook-soon). **Start cooking session** in the ribbon menu, or the command, writes `Cook session YYYY-MM-DD.md` in the session folder:
 
-- **Recipes** — with timings and how long each keeps
+- **Recipes** — a colored dot per recipe, with timings and how long each keeps
 - **Equipment** — the combined `equipment` lists
-- **Prep list** — one section per technique in prep order, each ingredient merged across recipes with a per-recipe breakdown, so all the peeling happens before all the dicing
-- **Cook order** — recipes grouped by `oven-temp` (lowest first, stovetop last), longest `cook-time` first, each with its steps
+- **Prep list** — one section per technique in prep order, each ingredient merged across recipes, with each recipe's dot and amount, so all the peeling happens before all the dicing
+- **Cook order** — numbered steps, with *meanwhile* steps under the step they run alongside
 - **Store and reheat** — from each recipe's `## Store it` and `## Reheat it` sections
 - **My notes** — yours; kept when the session is regenerated
+
+**Arranging the cook order.** Each `---` block of a recipe is one step. Starting a session opens the arrange window: drag steps (or use the arrows) into the order you'll cook them, and tick **Meanwhile** on a step to do it while the step above runs, e.g. soak the cashews while the oats bake. **Save cook order** rewrites the note. The order is stored in the note's `cook-plan` frontmatter, so regenerating keeps it; steps from new or edited recipes are added at the end. Reopen the window from the *Arrange the cook order* link at the top of the note, or the **Arrange cook order** command. Before arranging, recipes run one after another: lowest `oven-temp` first, longest `cook-time` first, stovetop last. A step moved ahead of an earlier step of its own recipe is flagged, not blocked.
 
 The ribbon option *Also mark them cook soon* sends the same recipes to the shopping list. Optional recipe properties used here: `oven-temp`, `equipment`, `fridge-days`, `freezer-months`, `prep-time`, `cook-time`, `serving-size`.
 
@@ -225,7 +227,8 @@ Groups are fully editable in settings — rename them, add keywords, or create y
 | --- | --- |
 | **Browse recipes** | Opens the recipe browser |
 | **Open shopping list** | Opens the shopping list sidebar panel |
-| **Start cooking session** | Writes today's session note for the cook-together recipes |
+| **Start cooking session** | Writes today's session note for the cook-together recipes and opens the arrange window |
+| **Arrange cook order** | Rearranges the steps of the open session note |
 | **Check recipe technique tags** | Lists unknown technique tags and untagged prep |
 
 ## Settings

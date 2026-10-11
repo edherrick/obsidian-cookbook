@@ -19,7 +19,12 @@ import { UNCATEGORIZED } from "./ingredients/categorize";
 import { ShoppingListPersistence } from "./shopping/persistence";
 import type { PersistedShoppingList, StoreLayout } from "./types";
 import { Vocabulary } from "./vocab/vocabulary";
-import { writeCookSession } from "./session/write";
+import { loadCookSession, prepareCookSession, writeCookSessionNote } from "./session/write";
+import type { CookSession } from "./session/write";
+import { recipeDots } from "./session/build";
+import { toPlan } from "./session/plan";
+import type { PlanEntry } from "./session/plan";
+import ArrangeStepsModal from "./ui/modals/ArrangeStepsModal.svelte";
 import { VocabularyCheckModal } from "./vocab/checkModal";
 import { indexIngredientNames } from "./vocab/names";
 import type { IngredientName } from "./vocab/names";
@@ -96,6 +101,24 @@ export default class CookbookPlugin extends Plugin {
 			id: "create-cook-session",
 			name: "Start cooking session",
 			callback: () => void this.createCookSession(false),
+		});
+
+		this.addCommand({
+			id: "arrange-cook-order",
+			name: "Arrange cook order",
+			checkCallback: (checking) => {
+				const file = this.app.workspace.getActiveFile();
+				if (!file || !this.isCookSession(file)) return false;
+				if (!checking) void this.arrangeSessionFile(file);
+				return true;
+			},
+		});
+
+		// The "Arrange the cook order" link in each session note
+		this.registerObsidianProtocolHandler("cookbook-arrange", (params) => {
+			const file = params.file ? this.app.vault.getFileByPath(params.file) : null;
+			if (file) void this.arrangeSessionFile(file);
+			else new Notice("Could not find that cook session note.");
 		});
 
 		this.addCommand({
@@ -253,20 +276,64 @@ export default class CookbookPlugin extends Plugin {
 			);
 		}
 		try {
-			const file = await writeCookSession(this.app, recipes, {
+			const session = await prepareCookSession(this.app, recipes, {
 				folder: this.settings.cookSessionFolder,
-				vocab: this.vocabulary,
 				cache: this.ingredientCache,
-				unitPrefs: {
-					preferredVolumeUnit: this.settings.preferredVolumeUnit,
-					preferredWeightUnit: this.settings.preferredWeightUnit,
-				},
 			});
+			const file = await this.saveCookSession(session, toPlan(session.steps));
 			await this.app.workspace.getLeaf("tab").openFile(file);
+			this.openArrangeModal(session);
 		} catch (e) {
 			console.error("cookbook: failed to write cook session", e);
 			new Notice("Could not write the cook session note. See the console for details.");
 		}
+	}
+
+	private saveCookSession(session: CookSession, plan: PlanEntry[]): Promise<TFile> {
+		return writeCookSessionNote(this.app, session, plan, {
+			vocab: this.vocabulary,
+			unitPrefs: {
+				preferredVolumeUnit: this.settings.preferredVolumeUnit,
+				preferredWeightUnit: this.settings.preferredWeightUnit,
+			},
+		});
+	}
+
+	private isCookSession(file: TFile): boolean {
+		const tags: unknown = this.app.metadataCache.getFileCache(file)?.frontmatter?.tags;
+		const list = Array.isArray(tags) ? tags : typeof tags === "string" ? [tags] : [];
+		return list.some((t) => String(t).replace(/^#/, "") === "cook-session");
+	}
+
+	private openArrangeModal(session: CookSession): void {
+		new SvelteModalWrapper(this.app, ArrangeStepsModal, {
+			session,
+			dots: recipeDots(session.recipes),
+			save: async (plan: PlanEntry[]) => {
+				try {
+					await this.saveCookSession(session, plan);
+				} catch (e) {
+					console.error("cookbook: failed to save cook order", e);
+					new Notice("Could not save the cook order. See the console for details.");
+					throw e;
+				}
+			},
+		}).open();
+	}
+
+	/** Reopen a session note's recipes and cook order for arranging. */
+	async arrangeSessionFile(file: TFile): Promise<void> {
+		await this.refreshRecipes();
+		const recipes = get(this.recipeStores.recipes);
+		const session = await loadCookSession(this.app, file, {
+			cache: this.ingredientCache,
+			findRecipe: (path) => recipes.find((r) => r.path === path),
+		});
+		if (!session) {
+			new Notice("This cook session doesn't link any recipes that still exist.");
+			return;
+		}
+		this.openArrangeModal(session);
 	}
 
 	/** Pick up checkbox edits the user made directly in the shopping list note. */

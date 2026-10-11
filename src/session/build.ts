@@ -6,6 +6,11 @@ import { aggregateItems } from "../ingredients/aggregate";
 import type { DisplayUnitPrefs } from "../ingredients/aggregate";
 import { formatQty, roundQty } from "../ingredients/units";
 import { stripParentheticals } from "../ingredients/normalize";
+import { cookOrder, extractSection } from "./steps";
+import { planSteps, serializePlan, toPlan } from "./plan";
+import type { PlanEntry, PlannedStep } from "./plan";
+
+export { cookOrder, extractSection, extractSteps } from "./steps";
 
 /** One recipe going into a cook session. */
 export interface SessionRecipe {
@@ -33,6 +38,10 @@ export interface SessionOptions {
 	existingContent?: string;
 	/** How to link a recipe; defaults to a path wikilink aliased to the title. */
 	linkTo?: (r: SessionRecipe) => string;
+	/** A hand-arranged cook order; without one, recipes run one after another. */
+	plan?: PlanEntry[];
+	/** A link that opens the arrange-steps modal for this note. */
+	arrangeLink?: string;
 }
 
 export const MY_NOTES_HEADING = "## My notes";
@@ -43,60 +52,6 @@ export const MY_NOTES_HEADING = "## My notes";
  */
 const NOT_PREP_RE =
 	/^(?:optional|to taste|plus\b|for serving|for garnish|for topping|packed|divided|at room temperature|room temperature|if desired|as needed|warm|cold|about\b)/i;
-
-// ─── Reading recipe notes ───────────────────────────────────────────────────
-
-function stripFrontmatter(content: string): string {
-	return content.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "");
-}
-
-const STEP_HEADINGS = /^##\s+(?:ingredients|directions|steps|method|instructions)\b/i;
-
-/**
- * The cooking part of a recipe: from its Ingredients heading to the first
- * other level-two heading (Nutrition, Store it, Notes…). The Ingredients and
- * Directions headings themselves are dropped — the session supplies its own.
- */
-export function extractSteps(content: string): string {
-	const lines = stripFrontmatter(content).split("\n");
-	let start = lines.findIndex((l) => STEP_HEADINGS.test(l));
-	if (start === -1) start = 0;
-
-	const out: string[] = [];
-	for (let i = start; i < lines.length; i++) {
-		const line = lines[i]!;
-		if (/^##\s/.test(line)) {
-			if (STEP_HEADINGS.test(line)) continue;
-			break;
-		}
-		out.push(line);
-	}
-	return trimRules(out).join("\n");
-}
-
-/** Body of one `## Heading` section, or "" when the note has none. */
-export function extractSection(content: string, heading: string): string {
-	const lines = stripFrontmatter(content).split("\n");
-	const want = heading.trim().toLowerCase();
-	const start = lines.findIndex((l) => /^##\s/.test(l) && l.slice(2).trim().toLowerCase() === want);
-	if (start === -1) return "";
-	const out: string[] = [];
-	for (let i = start + 1; i < lines.length; i++) {
-		if (/^##?\s/.test(lines[i]!)) break;
-		out.push(lines[i]!);
-	}
-	return trimRules(out).join("\n");
-}
-
-/** Drop blank lines and `---` rules from both ends. */
-function trimRules(lines: string[]): string[] {
-	const isEdge = (l: string) => l.trim() === "" || /^-{3,}\s*$/.test(l);
-	let a = 0;
-	let b = lines.length;
-	while (a < b && isEdge(lines[a]!)) a++;
-	while (b > a && isEdge(lines[b - 1]!)) b--;
-	return lines.slice(a, b);
-}
 
 /** Everything from the "My notes" heading on, so a regenerate keeps it. */
 export function keptNotes(existing: string | undefined): string {
@@ -252,20 +207,6 @@ export function buildPrepList(recipes: SessionRecipe[], opts: SessionOptions): s
 
 // ─── Cook order ─────────────────────────────────────────────────────────────
 
-/**
- * Lowest oven first, so the oven only ever heats up between batches; within
- * one temperature, the longest cook goes in first. Stovetop recipes close the
- * session — they fit around whatever is in the oven.
- */
-export function cookOrder(recipes: SessionRecipe[]): SessionRecipe[] {
-	return [...recipes].sort((a, b) => {
-		const ta = a.ovenTemp ?? Infinity;
-		const tb = b.ovenTemp ?? Infinity;
-		if (ta !== tb) return ta - tb;
-		return (b.cookTime ?? 0) - (a.cookTime ?? 0) || a.title.localeCompare(b.title);
-	});
-}
-
 function timing(r: SessionRecipe): string {
 	return [
 		r.prepTime ? `prep ${r.prepTime} min` : "",
@@ -286,6 +227,34 @@ function storage(r: SessionRecipe): string {
 		.join(" · ");
 }
 
+/**
+ * The plan as a numbered list of main steps, each followed by whatever is done
+ * meanwhile. A recipe's first appearance carries its oven temperature and
+ * timings, so preheating and the overall timing stay visible.
+ */
+export function renderCookOrder(
+	planned: PlannedStep[],
+	link: (r: SessionRecipe) => string,
+	dot: (r: SessionRecipe) => string,
+): string {
+	if (planned.length === 0) return "_No steps found._";
+	const introduced = new Set<string>();
+	let n = 0;
+	return planned
+		.map(({ block, recipe, meanwhile }) => {
+			const first = !introduced.has(recipe.path);
+			introduced.add(recipe.path);
+			const oven = first && recipe.ovenTemp ? ` · oven ${recipe.ovenTemp}ºF` : "";
+			const heading = meanwhile
+				? `#### ↳ Meanwhile: ${dot(recipe)} ${link(recipe)}${oven}`
+				: `### ${++n}. ${dot(recipe)} ${link(recipe)}${oven}`;
+			const t = first ? timing(recipe) : "";
+			const meta = [`step ${block.index} of ${block.total}`, t].filter(Boolean).join(" · ");
+			return `${heading}\n_${meta}_\n\n${block.text}`;
+		})
+		.join("\n\n");
+}
+
 // ─── The note ───────────────────────────────────────────────────────────────
 
 function defaultLink(r: SessionRecipe): string {
@@ -301,6 +270,7 @@ export function buildSessionNote(recipes: SessionRecipe[], opts: SessionOptions)
 	const ordered = cookOrder(recipes);
 	const dots = recipeDots(recipes);
 	const dot = (r: SessionRecipe) => dots.get(r.path) ?? "";
+	const planned = planSteps(recipes, opts.plan);
 
 	const frontmatter = [
 		"---",
@@ -309,6 +279,8 @@ export function buildSessionNote(recipes: SessionRecipe[], opts: SessionOptions)
 		`date: ${opts.date}`,
 		"recipes:",
 		...ordered.map((r) => `  - ${yamlString(link(r))}`),
+		"cook-plan:",
+		...serializePlan(toPlan(planned)).map((e) => `  - ${yamlString(e)}`),
 		"---",
 	].join("\n");
 
@@ -332,16 +304,6 @@ export function buildSessionNote(recipes: SessionRecipe[], opts: SessionOptions)
 		}
 	}
 
-	const steps: string[] = [];
-	let currentTemp: number | undefined | null = null;
-	for (const r of ordered) {
-		if (r.ovenTemp !== currentTemp) {
-			currentTemp = r.ovenTemp;
-			steps.push(currentTemp ? `### Oven at ${currentTemp}ºF` : "### Stovetop and no-cook");
-		}
-		const t = timing(r);
-		steps.push(`#### ${dot(r)} ${link(r)}${t ? `\n_${t}_` : ""}\n\n${extractSteps(r.content)}`);
-	}
 
 	const storeReheat = ordered
 		.map((r) => {
@@ -362,11 +324,17 @@ export function buildSessionNote(recipes: SessionRecipe[], opts: SessionOptions)
 	return [
 		frontmatter,
 		`# Cook session ${opts.date}`,
-		"> [!info] Generated by Cookbook\n> Everything above **My notes** is rewritten when this session is regenerated.",
+		[
+			"> [!info] Generated by Cookbook",
+			"> Everything above **My notes** is rewritten when this session is regenerated.",
+			opts.arrangeLink ? `> [Arrange the cook order](${opts.arrangeLink})` : "",
+		]
+			.filter(Boolean)
+			.join("\n"),
 		`## Recipes\n${recipeList}`,
 		equipment.length > 0 ? `## Equipment\n${equipment.map((e) => `- [ ] ${e}`).join("\n")}` : "",
 		`## Prep list\n${buildPrepList(ordered, opts)}`,
-		`## Cook order\n${steps.join("\n\n")}`,
+		`## Cook order\n${renderCookOrder(planned, link, dot)}`,
 		storeReheat ? `## Store and reheat\n${storeReheat}` : "",
 		keptNotes(opts.existingContent).trimEnd(),
 	]
