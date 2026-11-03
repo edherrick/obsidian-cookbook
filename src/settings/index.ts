@@ -80,6 +80,20 @@ export function mergeSettings(raw: Record<string, unknown>): CookbookSettings {
 	return settings;
 }
 
+/**
+ * Settings as written to data.json. Categories and dietary groups carry an
+ * empty `keywords` list that this version ignores: 1.5 iterates them, so a
+ * device still on 1.5 that syncs this file files items as Uncategorized
+ * instead of throwing.
+ */
+export function toSavedData(settings: CookbookSettings): Record<string, unknown> {
+	return {
+		...settings,
+		shoppingCategories: settings.shoppingCategories.map((c) => ({ ...c, keywords: [] })),
+		ingredientGroups: settings.ingredientGroups.map((g) => ({ ...g, keywords: [] })),
+	};
+}
+
 /** Keys that 1.5 and earlier stored and the ingredient list replaced. */
 const RETIRED_SETTING_KEYS = ["ingredientAliases", "stapleIngredients"];
 
@@ -93,7 +107,7 @@ export function convertedData(raw: Record<string, unknown>, settings: CookbookSe
 	const kept = Object.fromEntries(Object.entries(raw).filter(([key]) => !RETIRED_SETTING_KEYS.includes(key)));
 	return {
 		...kept,
-		...settings,
+		...toSavedData(settings),
 		legacyKeywordLists: legacyListsFrom(raw, STARTER_KEYWORD_LISTS),
 	};
 }

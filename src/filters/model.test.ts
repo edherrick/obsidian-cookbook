@@ -313,6 +313,8 @@ describe("recipeMatchesFilters — ingredient aliases", () => {
 			["__has-ingredient", { type: "has-ingredient" as const, ingredients: ["scallion"], logic: "and" as const }],
 		]);
 		expect(recipeMatchesFilters(recipe, filters, ctx)).toBe(true);
-		expect(recipeMatchesFilters(recipe, filters, { ...ctx, vocab: undefined })).toBe(false);
+		// Without the other name listed, "scallion" doesn't find "green onions"
+		const noAliases = new Vocabulary({ ...DEFAULT_SETTINGS, ingredients: [] });
+		expect(recipeMatchesFilters(recipe, filters, { ...ctx, vocab: noAliases })).toBe(false);
 	});
 });

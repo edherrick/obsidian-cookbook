@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { ingredientsFromKeywordLists, legacyListsFrom, needsIngredientMigration } from "./migrate";
 import { STARTER_KEYWORD_LISTS } from "./defaults";
-import { convertedData, mergeSettings } from "./index";
+import { convertedData, mergeSettings, toSavedData } from "./index";
 import type { LegacyKeywordLists } from "../types";
 
 const lists = (extra: Partial<LegacyKeywordLists> = {}): LegacyKeywordLists => ({
@@ -102,5 +102,19 @@ describe("converting saved settings", () => {
 	it("leaves converted data alone", () => {
 		const ingredients = [{ name: "kale", otherNames: [], category: "Produce", groups: [] }];
 		expect(mergeSettings({ ingredients }).ingredients).toEqual(ingredients);
+	});
+});
+
+describe("saved data stays readable by 1.5", () => {
+	it("gives categories and groups an empty keyword list", () => {
+		const data = toSavedData(mergeSettings({}));
+		for (const c of data.shoppingCategories as { keywords?: unknown }[]) expect(c.keywords).toEqual([]);
+		for (const g of data.ingredientGroups as { keywords?: unknown }[]) expect(g.keywords).toEqual([]);
+	});
+
+	it("loads them back as names only, without converting again", () => {
+		const data = toSavedData(mergeSettings({}));
+		expect(needsIngredientMigration(data)).toBe(false);
+		expect(mergeSettings(data).shoppingCategories[0]).toEqual({ name: "Produce" });
 	});
 });

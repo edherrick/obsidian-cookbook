@@ -2,7 +2,7 @@ import { Notice, Plugin, TFile, WorkspaceLeaf, debounce } from "obsidian";
 import type { Debouncer } from "obsidian";
 import { get } from "svelte/store";
 import { CookbookSettingTab } from "./settings/settingsTab";
-import { convertedData, mergeSettings } from "./settings";
+import { convertedData, mergeSettings, toSavedData } from "./settings";
 import { needsIngredientMigration } from "./settings/migrate";
 import type { CookbookSettings } from "./settings";
 import { SvelteModalWrapper } from "./utils/SvelteModalWrapper";
@@ -241,11 +241,16 @@ export default class CookbookPlugin extends Plugin {
 	saveSettings(): Promise<void> {
 		return this.saveQueue.run(async () => {
 			const existing = await this.readData();
-			await this.saveData({ ...existing, ...this.settings });
+			await this.saveData({ ...existing, ...toSavedData(this.settings) });
 			this.vocabulary = new Vocabulary(this.settings);
 			// A fresh object so every subscriber sees the change
 			this.recipeStores.settings.set({ ...this.settings });
 		});
+	}
+
+	/** Carry a category rename (or deletion, with `to` null) into the current shopping list. */
+	renameShoppingListCategory(from: string, to: string | null): Promise<void> {
+		return this.shopping.renameCategory(from, to);
 	}
 
 	/** Re-sort the open shopping list by the active store's aisle order. */

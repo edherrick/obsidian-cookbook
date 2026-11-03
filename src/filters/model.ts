@@ -45,8 +45,9 @@ export interface FilterContext {
 	/**
 	 * The ingredient list. Searching "green onion" also finds a recipe's
 	 * "scallion", and dietary group filters need it to know what's in a group.
+	 * Required: without it, a "no dairy" filter would quietly pass everything.
 	 */
-	vocab?: Vocabulary;
+	vocab: Vocabulary;
 }
 
 /**
@@ -104,21 +105,21 @@ export function buildFilterOptions(
 function ingredientTexts(recipe: Recipe, ctx: FilterContext): string[] {
 	return (ctx.ingredientsByPath.get(recipe.path) ?? []).flatMap((i) => {
 		const text = i.text.toLowerCase();
-		const canonical = ctx.vocab?.canonicalText(i.text).toLowerCase();
+		const canonical = ctx.vocab.canonicalText(i.text).toLowerCase();
 		return canonical && canonical !== text ? [text, canonical] : [text];
 	});
 }
 
 /** Does any ingredient text contain the query, or the query's canonical name? */
 function containsIngredient(texts: string[], query: string, ctx: FilterContext): boolean {
-	const canonical = ctx.vocab?.canonicalText(query).toLowerCase();
+	const canonical = ctx.vocab.canonicalText(query).toLowerCase();
 	return texts.some((t) => t.includes(query) || (!!canonical && t.includes(canonical)));
 }
 
 function recipeHasGroup(recipe: Recipe, groupName: string, ctx: FilterContext): boolean {
-	if (!ctx.vocab || !ctx.ingredientGroups.some((g) => g.name === groupName)) return false;
+	if (!ctx.ingredientGroups.some((g) => g.name === groupName)) return false;
 	const ingredients = ctx.ingredientsByPath.get(recipe.path) ?? [];
-	return ingredients.some((i) => ctx.vocab!.inGroup(i.text, groupName));
+	return ingredients.some((i) => ctx.vocab.inGroup(i.text, groupName));
 }
 
 export function recipeMatchesFilters(

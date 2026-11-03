@@ -12,12 +12,12 @@ An [Obsidian](https://obsidian.md) plugin to browse your recipe notes, filter th
 - **Serving multiplier** — scale any recipe before generating the shopping list (×2, ×3, etc.) directly from the recipe card, detail view, or ribbon menu
 - **Shopping list** — generate a categorised, grouped shopping list from your cook-soon recipes
 - **Smart ingredient parsing** — quantities, units, and fractions are extracted automatically; ingredients are aggregated across recipes with unit-aware conversion
-- **Custom items** — add one-off items to the shopping list manually; items are auto-categorised by keyword
-- **Store aisle maps** — save a route per shop and the list sorts itself into that order; drag categories once and it sticks
+- **Custom items** — add one-off items to the shopping list manually; they're filed by your ingredient list
+- **Store layouts** — give each shop numbered aisles (and move single ingredients where that shop keeps them); the list sorts itself into that shop's order
 - **Drag to reorder** — rearrange shopping list categories by dragging
 - **Recipe detail** — click any recipe card to read the full note rendered inside Obsidian
 - **Technique tags** — tag prep on ingredient lines (`#prep/dice`, `#prep/mince`); a check command finds typos and untagged prep
-- **Ingredient aliases** — tell the cookbook that `green onion` and `scallion` are one ingredient; a names panel suggests likely duplicates to merge
+- **Ingredient list** — one list where each ingredient has a category, dietary groups, other names and a staple flag; a names panel adds the ingredients your recipes use and suggests duplicates to merge
 - **Cooks well with** — the recipe detail lists the recipes that share the most distinctive ingredients, and the browser can sort by overlap with your cook-together set
 - **Cooking sessions** — mark recipes *cook together* and generate one note with the combined equipment, a prep list grouped by technique, every recipe's steps in a cook order you can arrange by hand, and store/reheat instructions
 
@@ -113,15 +113,22 @@ Techniques are a fixed list in settings (peel, halve, seed, quarter, dice, chop,
 
 Because they are ordinary Obsidian tags, selecting `#prep/dice` searches every recipe that dices something, and the browser offers a `technique` filter.
 
-#### Ingredient aliases
+#### The ingredient list
 
-Settings → **Ingredient aliases** maps other names onto one canonical name (`scallion` ← `green onion`, `spring onion`). Aliased lines merge on the shopping list, count as overlap and match ingredient filters by any of their names. Matching is exact (after normalisation and ignoring plurals), so an alias never swallows a longer name like `green onion dip`.
+Settings → **Ingredients** is the one place an ingredient is described. Each ingredient has:
 
-**Scan ingredient names** lists every ingredient in your library with how many recipes use it and suggests likely duplicates — `apple` / `red apple`, `ceasar` / `caesar`. **Merge into…** adds the name as an alias.
+- a **category** (Produce, Dairy & Eggs…), which files it on the shopping list
+- **dietary groups** (Dairy, Gluten…), used by the dietary filters
+- **other names** — `scallion` also answers to `green onion` and `spring onion`. Lines using any of its names merge on the shopping list, count as overlap and match ingredient filters
+- a **staple** flag for things nearly every recipe uses
+
+Search the list by name, category or tag (`Dairy`, `staple`). **Categories**, **Dietary groups** and **Staples** sit at the top of the page; renaming or deleting a category or group updates every ingredient, store aisle and the current shopping list.
+
+**Find duplicates and missing ingredients** scans your recipes. Names that aren't in the list get an **Add** button, which creates the ingredient with a best guess at its category and groups for you to check. Likely duplicates — `apple` / `red apple`, `ceasar` / `caesar` — can be merged, which makes one name another name of the other.
 
 #### Cooks well with
 
-Two recipes overlap on the distinctive ingredients they share. Staples (salt, oil, dried herbs…) and the Pantry and Baking & Spices aisles are ignored, since they say nothing about shopping or prepping together; both lists are editable in settings. The recipe detail shows the top three matches with the shared ingredients, and **Sort → Overlap with cook-together set** in the browser puts the recipes that best extend your current session first.
+Two recipes overlap on the distinctive ingredients they share. Staples (salt, oil, dried herbs…) and the Pantry and Baking & Spices categories are ignored, since they say nothing about shopping or prepping together. Staples are set under **Ingredients → Staples**, ignored categories under **Overlap**. The recipe detail shows the top three matches with the shared ingredients, and **Sort → Overlap with cook-together set** in the browser puts the recipes that best extend your current session first.
 
 #### Cooking sessions
 
@@ -156,11 +163,11 @@ Names are compared after stripping wikilinks, parentheticals and leading descrip
 
 #### Categorising items
 
-Each ingredient goes to the category with the **most specific matching keyword**, not simply the first category that matches. Keywords match whole words only.
+A line is filed by the ingredient it names. A line that is exactly an ingredient's name (or another name) is that ingredient; otherwise the **longest** ingredient name found in it wins, matching whole words only.
 
-That combination is what keeps `full-fat coconut milk` in **Pantry** (the 12-character `coconut milk` beats Dairy's `milk`) and `horseradish cheddar cheese` in **Dairy & Eggs** (Produce's `radish` no longer matches inside `horseradish`).
+That is what keeps `full-fat coconut milk` in **Pantry** (`coconut milk` is longer than `milk`) and `horseradish cheddar cheese` in **Dairy & Eggs** (`radish` doesn't match inside `horseradish`). Lines only merge when they name the same ingredient exactly, so `blueberries` and `raspberries` stay two lines.
 
-Items that cannot be matched to a category fall into **Uncategorized** at the bottom of the list.
+Items that match no ingredient fall into **Uncategorized** at the bottom of the list.
 
 ### Filtering recipes
 
@@ -187,18 +194,13 @@ The recipe browser supports multiple filter types that can be combined:
 
 Fish and shellfish are separate groups, as are tree nuts and peanuts — they are distinct allergens, and someone reacting to shrimp can still eat salmon.
 
-#### Exclusions
+#### Look-alikes and "free-from"
 
-Each group also has an **exclusion list** for terms that look like a match but are not one. Without it, a bare `milk` keyword would drag `coconut milk`, `oat milk` and `almond milk` into Dairy, and `noodle` would put `rice noodles` in Gluten.
+Every ingredient named in a line counts towards its dietary groups, so `butter and almonds` is both Dairy and Tree Nuts. A name that sits inside a longer one doesn't count: `coconut milk`, `peanut butter` and `rice noodles` are ingredients of their own, without Dairy or Gluten, so they keep `milk`, `butter` and `noodle` from matching.
 
-```
-Dairy   keywords   milk, butter, cream, cheese…
-        excludes   coconut milk, almond milk, peanut butter, cream of tartar…
-```
+A line that says it's free of a group — `gluten-free flour`, `dairy-free yogurt` — doesn't count for that group. The group's name is the word, so no list is needed.
 
-Exclusions are checked per ingredient line, so a recipe listing both `peanut butter` and `6 tbsp butter` still counts as Dairy — via the second line.
-
-Groups are fully editable in settings — rename them, add keywords, or create your own. You can also use frontmatter flags on individual recipes (e.g. `isVegan: true`) and filter on those directly using the frontmatter filter.
+Add, rename or remove dietary groups under **Ingredients → Dietary groups**, and tag ingredients on the Ingredients page. You can also use frontmatter flags on individual recipes (e.g. `isVegan: true`) and filter on those directly using the frontmatter filter.
 
 ### Using the plugin
 
@@ -265,31 +267,24 @@ When enabled, checking off a shopping list item removes it from the list immedia
 
 Choose which unit to use when displaying aggregated volume or weight quantities on the shopping list (e.g. prefer `cups` over `ml`). Defaults to auto, which uses whichever unit appears first.
 
-### Ingredient groups
+### Ingredients
 
-Named groups of ingredient keywords used by the dietary group filters in the recipe browser. Six groups are pre-configured (Dairy, Meat & Poultry, Fish & Seafood, Eggs, Nuts, Gluten). You can add your own groups, edit the keywords, or remove groups you don't need. **Restore defaults** puts the shipped groups back, which is also how you pick up keyword improvements from a plugin update.
+The ingredient list (see [The ingredient list](#the-ingredient-list)), with three pages at the top:
 
-### Shopping list categories
+- **Categories** — names only, with how many ingredients use each. Default categories, in default walking order: Produce, Bakery, Deli, Meat & Fish, Dairy & Eggs, Pantry, Baking & Spices, Condiments & Sauces, Drinks, Frozen, Household & Other. **Household & Other** catches non-food items you add by hand, such as toothpaste. You can also create a category from any ingredient's **Category** dropdown.
+- **Dietary groups** — names only. Ten are pre-configured, with fish and shellfish, and tree nuts and peanuts, kept apart as distinct allergens.
+- **Staples** — every staple as one block; removing one clears that ingredient's **Staple** switch.
 
-Keyword-based categories that group items on the shopping list. When a list is generated, each ingredient is matched against your category keywords and grouped accordingly. Unmatched items go to **Uncategorized**.
-
-Default categories, in default walking order: Produce, Bakery, Deli, Meat & Fish, Dairy & Eggs, Pantry, Baking & Spices, Condiments & Sauces, Drinks, Frozen, Household & Other. **Household & Other** catches non-food items you add by hand, such as toothpaste.
-
-You can add, remove, reorder, and edit categories and their keywords from the settings tab, and **Restore defaults** puts the shipped set back.
-
-Keywords match whole words, so `pea` will not match `peanut butter`. Compound names need their own keyword — the defaults list `blueberries` separately from `berries` for exactly this reason.
-
-The order you arrange categories into on the shopping list is stored against a **store layout** — see below.
+The list button above the ingredients adds any starter ingredients you don't have, which is also how you pick up additions from a plugin update.
 
 ### Store layouts
 
-A store layout is a **route**: the order one shop's aisles are walked in. Categories say *what* an ingredient is; a layout says *where it is in this particular shop*.
+A store layout says *where things are in one shop*; categories say *what* an ingredient is. Open a store to set it up:
 
-Reorder categories in the shopping list — by dragging, or with the ▲/▼ buttons — and the new order is saved into the active layout. Learn the route once and every future list comes out in that order.
+- **Numbered aisles** — give an aisle a number, pick the categories shelved there, and under **Also here** pick single ingredients this shop keeps there whatever their category (soy sauce in International, say). On the shopping list, numbered aisles come first, in number order.
+- **Categories not in an aisle** — everything else, in the order you walk it. Drag to reorder here, or drag categories in the shopping list itself; the order is saved into the active store.
 
-With more than one layout defined, a picker appears in the shopping list header. Switching re-sorts the current list into that shop's route. Add, rename, duplicate and delete layouts in settings; **Duplicate** is the quick way to start a new shop from a route you already walk.
-
-Layouts reference categories by name, so a category a layout does not mention simply falls to the bottom of the list.
+A store with no numbered aisles is simply its category order. With more than one store, a picker appears in the shopping list header and switching re-sorts the list. **Duplicate store** is the quick way to start a new shop from one you already know.
 
 ### Cooking sessions
 
@@ -299,13 +294,20 @@ The cook-together property (default `cook-together`) and the folder session note
 
 The technique tag prefix (default `prep`) and the ordered technique list. Order is prep order; keywords are the untagged words that count as the technique.
 
-### Ingredient aliases
-
-Canonical names and the other names they absorb, plus the ingredient names panel.
-
 ### Overlap
 
-Staple ingredients and ignored aisles, both left out of overlap scoring.
+**Ignored categories** — categories whose ingredients are left out of overlap scoring. Staples are set under **Ingredients → Staples**.
+
+## Upgrading to 2.0
+
+2.0 replaces the separate keyword lists (category keywords, dietary keywords and exclusions, aliases, staples) with the ingredient list. Your settings are converted once, the first time 2.0 loads:
+
+- every keyword becomes an ingredient, tagged so that each recipe line is filed, grouped and flagged exactly as before
+- the old lists are kept in the plugin's `data.json` under `legacyKeywordLists`
+
+Because the old lists were matched as words, some tags carry over from shorter words inside longer names — `peanut butter` marked staple through `butter`, for example. They behaved that way before too; now they're visible, and **Ingredients → Staples** is the quickest place to tidy them.
+
+**Update the plugin on every device you sync.** An older version reading 2.0 settings files everything as Uncategorized, and keyword edits made there are not picked up by 2.0.
 
 ## Installation
 

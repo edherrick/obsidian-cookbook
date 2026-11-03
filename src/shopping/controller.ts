@@ -5,6 +5,7 @@ import { buildShoppingList } from "./build";
 import { ShoppingListPersistence, parseShoppingListFromMarkdown } from "./persistence";
 import { UNCATEGORIZED } from "../ingredients/categorize";
 import { resolveRoute } from "./route";
+import { renameListCategory } from "./listEdits";
 import { VIEW_TYPE_SHOPPING } from "../ui/views/CookbookShoppingView";
 import type { ShoppingViewDeps } from "../ui/views/CookbookShoppingView";
 import type { PersistedShoppingList, StoreLayout } from "../types";
@@ -117,6 +118,13 @@ export class ShoppingListController {
 		const categoryOrder = [...resolveRoute(layout.aisleOrder, this.plugin.settings.shoppingCategories), UNCATEGORIZED];
 		if (categoryOrder.join("\n") === list.categoryOrder.join("\n")) return;
 		await this.save({ ...list, categoryOrder });
+	}
+
+	/** Follow a category rename (or deletion, with `to` null) into the loaded list. */
+	async renameCategory(from: string, to: string | null): Promise<void> {
+		const list = get(this.plugin.recipeStores.shoppingList);
+		const next = list ? renameListCategory(list, from, to) : null;
+		if (next) await this.save(next);
 	}
 
 	private activeLayout(): StoreLayout | undefined {

@@ -172,9 +172,29 @@ function renderName(setting: Setting, layout: StoreLayout, host: SettingsHost): 
 				layout.name = value;
 				host.saveSoon();
 			});
-		// The page title and the active-store dropdown show the name, so rebuild once editing ends
-		t.inputEl.addEventListener("change", () => host.refresh());
+		// The page is named after the store, so a rename removes the page being
+		// shown: step back to the store list, rebuild, and reopen it by its new name
+		t.inputEl.addEventListener("change", () => {
+			const doc = setting.settingEl.doc;
+			leavePage(setting.settingEl);
+			host.refresh();
+			const name = layout.name || "Unnamed store";
+			window.setTimeout(() => {
+				const entry = Array.from(doc.querySelectorAll<HTMLElement>(".setting-item")).find(
+					(el) => el.querySelector(".setting-item-name")?.textContent === name,
+				);
+				entry?.click();
+			}, 0);
+		});
 	});
+}
+
+/**
+ * Go back from the settings page holding `el`. There is no navigation API,
+ * but every settings page has a back button.
+ */
+function leavePage(el: HTMLElement): void {
+	el.closest(".setting-page")?.querySelector<HTMLElement>(".setting-page-back-button")?.click();
 }
 
 /** Two clicks to delete, so one stray click can't lose a route. */
@@ -195,12 +215,8 @@ function renderDelete(setting: Setting, layout: StoreLayout, host: SettingsHost)
 				}
 				window.clearTimeout(timer);
 				timer = null;
-				// This page is the deleted store's, so leave it first: there is
-				// no navigation API, but every settings page has a back button
-				const back = setting.settingEl
-					.closest(".setting-page")
-					?.querySelector<HTMLElement>(".setting-page-back-button");
-				back?.click();
+				// This page is the deleted store's, so leave it first
+				leavePage(setting.settingEl);
 				deleteStore(host, layout);
 			});
 	});

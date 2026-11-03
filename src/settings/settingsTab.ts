@@ -271,8 +271,14 @@ export class CookbookSettingTab extends PluginSettingTab implements SettingsHost
 												namePlaceholder: "Name (e.g. Produce)",
 												reorderable: true,
 												usage: (name) => usage(settings.ingredients.filter((i) => i.category === name).length),
-												onRename: (from, to) => renameCategory(settings, from, to),
-												onDelete: (name) => deleteCategory(settings, name),
+												onRename: (from, to) => {
+													renameCategory(settings, from, to);
+													void this.plugin.renameShoppingListCategory(from, to);
+												},
+												onDelete: (name) => {
+													deleteCategory(settings, name);
+													void this.plugin.renameShoppingListCategory(name, null);
+												},
 											}),
 										],
 									},
