@@ -5,6 +5,11 @@ import type { IngredientName } from "../vocab/names";
 
 let datalistSeq = 0;
 
+/** Scan results kept by the settings tab, so a re-render after a merge doesn't lose them. */
+export interface IngredientNamesState {
+	names: IngredientName[] | null;
+}
+
 /**
  * Every ingredient name in the library with how many recipes use it. Likely
  * duplicates are suggested; any name can be merged into another, which adds
@@ -13,16 +18,25 @@ let datalistSeq = 0;
 export function renderIngredientNamesPanel(
 	container: HTMLElement,
 	plugin: CookbookPlugin,
+	state: IngredientNamesState,
 	onMerged: () => void,
 ): void {
 	container.empty();
 	container.addClass("cookbook-names-panel");
 
+	if (state.names) {
+		renderNames(container, plugin, state.names, onMerged);
+		return;
+	}
+
 	const scanBtn = container.createEl("button", { text: "Scan ingredient names" });
 	scanBtn.addEventListener("click", () => {
 		scanBtn.disabled = true;
 		scanBtn.setText("Scanning…");
-		void plugin.ingredientNames().then((names) => renderNames(container, plugin, names, onMerged));
+		void plugin.ingredientNames().then((names) => {
+			state.names = names;
+			renderNames(container, plugin, names, onMerged);
+		});
 	});
 }
 

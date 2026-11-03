@@ -1,29 +1,147 @@
-import { App, PluginSettingTab, Setting, debounce, setIcon } from "obsidian";
-import type { Debouncer } from "obsidian";
+import { PluginSettingTab, debounce } from "obsidian";
+import type { App, Debouncer, Setting, SettingDefinitionItem } from "obsidian";
 import type CookbookPlugin from "../main";
-import { PathSuggest } from "../utils/suggesters/PathSuggest";
-import type { IngredientGroup, KeywordGroup, StoreLayout } from "../types";
+import type { CookbookSettings } from "./index";
 import { cloneDefaultSettings } from "./index";
+import { commaList } from "./host";
+import type { SettingsHost } from "./host";
+import { keywordList } from "./keywordList";
+import { storeLayoutItems } from "./storeLayouts";
+import { PathPickerModal } from "./pathPickerModal";
 import { renderIngredientNamesPanel } from "./ingredientNamesPanel";
-
-function commaList(value: string): string[] {
-	return value
-		.split(",")
-		.map((s) => s.trim())
-		.filter((s) => s.length > 0);
-}
+import type { IngredientNamesState } from "./ingredientNamesPanel";
 
 /** Keystrokes shouldn't each cost a disk read + write. */
 const SAVE_DEBOUNCE_MS = 400;
 
-export class CookbookSettingTab extends PluginSettingTab {
+const VOLUME_UNITS = ["ml", "tsp", "tbsp", "cups", "pt", "l"];
+const WEIGHT_UNITS = ["g", "kg", "oz", "lb"];
+
+/**
+ * How a control's shown value maps to a stored setting, for settings that
+ * aren't stored the way they're edited. Anything not listed is read and
+ * written as-is.
+ */
+interface Codec {
+	get: (s: CookbookSettings) => unknown;
+	set: (s: CookbookSettings, value: unknown) => void;
+}
+
+const text = (value: unknown): string => (typeof value === "string" ? value : "");
+
+/** A text property that falls back to its default when cleared. */
+const withFallback = (key: "cookSoonProp" | "coverProp" | "cookTogetherProp", fallback: string): Codec => ({
+	get: (s) => s[key],
+	set: (s, v) => {
+		s[key] = text(v).trim() || fallback;
+	},
+});
+
+const CODECS: Partial<Record<keyof CookbookSettings, Codec>> = {
+	propsToShow: {
+		get: (s) => s.propsToShow.join(", "),
+		set: (s, v) => {
+			s.propsToShow = commaList(text(v));
+		},
+	},
+	recipesFolder: {
+		// "." means the whole vault, shown as an empty field
+		get: (s) => (s.recipesFolder && s.recipesFolder !== "." ? s.recipesFolder : ""),
+		set: (s, v) => {
+			s.recipesFolder = text(v).trim() || ".";
+		},
+	},
+	recipesTag: {
+		get: (s) => s.recipesTag ?? "#recipe",
+		set: (s, v) => {
+			const tag = text(v).trim() || "#recipe";
+			s.recipesTag = tag.startsWith("#") ? tag : `#${tag}`;
+		},
+	},
+	cookSoonProp: withFallback("cookSoonProp", "cook-soon"),
+	coverProp: withFallback("coverProp", "cover"),
+	cookTogetherProp: withFallback("cookTogetherProp", "cook-together"),
+	cookSessionFolder: {
+		get: (s) => s.cookSessionFolder,
+		set: (s, v) => {
+			s.cookSessionFolder = text(v).trim();
+		},
+	},
+	techniqueTagPrefix: {
+		get: (s) => s.techniqueTagPrefix,
+		set: (s, v) => {
+			s.techniqueTagPrefix =
+				text(v).replace(/^#/, "").replace(/\/+$/, "").trim() || "prep";
+		},
+	},
+	preferredVolumeUnit: {
+		get: (s) => s.preferredVolumeUnit ?? "",
+		set: (s, v) => {
+			s.preferredVolumeUnit = text(v) || undefined;
+		},
+	},
+	preferredWeightUnit: {
+		get: (s) => s.preferredWeightUnit ?? "",
+		set: (s, v) => {
+			s.preferredWeightUnit = text(v) || undefined;
+		},
+	},
+	shoppingListFilePath: {
+		get: (s) => s.shoppingListFilePath ?? "",
+		set: (s, v) => {
+			s.shoppingListFilePath = text(v).trim() || undefined;
+		},
+	},
+	activeStoreLayout: {
+		get: (s) => s.activeStoreLayout ?? s.storeLayouts[0]?.name ?? "",
+		set: (s, v) => {
+			s.activeStoreLayout = text(v);
+		},
+	},
+	stapleIngredients: {
+		get: (s) => s.stapleIngredients.join(", "),
+		set: (s, v) => {
+			s.stapleIngredients = commaList(text(v));
+		},
+	},
+	overlapIgnoreCategories: {
+		get: (s) => s.overlapIgnoreCategories.join(", "),
+		set: (s, v) => {
+			s.overlapIgnoreCategories = commaList(text(v));
+		},
+	},
+};
+
+const unitOptions = (units: string[]): Record<string, string> => ({
+	"": "Auto",
+	...Object.fromEntries(units.map((u) => [u, u])),
+});
+
+export class CookbookSettingTab extends PluginSettingTab implements SettingsHost {
 	plugin: CookbookPlugin;
 	private readonly saveDebounced: Debouncer<[], void>;
+	private readonly namesState: IngredientNamesState = { names: null };
 
 	constructor(app: App, plugin: CookbookPlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
+		this.icon = "utensils";
 		this.saveDebounced = debounce(() => void this.plugin.saveSettings(), SAVE_DEBOUNCE_MS, false);
+	}
+
+	// ─── SettingsHost ────────────────────────────────────────────────────────
+
+	saveSoon(): void {
+		this.saveDebounced();
+	}
+
+	saveNow(): void {
+		this.saveDebounced.cancel();
+		void this.plugin.saveSettings();
+	}
+
+	refresh(): void {
+		this.update();
 	}
 
 	/** Write any pending edit now, so closing settings can't drop the last keystrokes. */
@@ -32,575 +150,254 @@ export class CookbookSettingTab extends PluginSettingTab {
 		super.hide();
 	}
 
-	/** Edits any named keyword list — shopping categories and ingredient groups alike. */
-	private renderCategoryEditor(
-		container: HTMLElement,
-		getItems: () => KeywordGroup[],
-		options: {
-			namePlaceholder: string;
-			keywordsPlaceholder?: string;
-			addLabel: string;
-			reorderable?: boolean;
-			/** Dietary groups only: a second list of terms that must NOT match. */
-			excludable?: boolean;
-		},
-	): void {
-		container.empty();
-		const items = getItems();
-		const rerender = () => this.renderCategoryEditor(container, getItems, options);
+	// ─── Control values ──────────────────────────────────────────────────────
+	// Overridden because the default writes plugin.settings straight to disk,
+	// which would drop the shopping list stored alongside it in data.json.
 
-		const mkBtn = (parent: HTMLElement, icon: string, tooltip: string, danger = false) => {
-			const btn = parent.createEl("button");
-			btn.title = tooltip;
-			if (danger) btn.addClass("is-danger");
-			setIcon(btn, icon);
-			return btn;
-		};
-
-		items.forEach((item, idx) => {
-			const row = container.createDiv({ cls: "cookbook-cat-row" });
-			const fields = row.createDiv({ cls: "cookbook-cat-fields" });
-
-			const nameInput = fields.createEl("input", { type: "text" });
-			nameInput.className = "cookbook-cat-name";
-			nameInput.placeholder = options.namePlaceholder;
-			nameInput.value = item.name;
-			nameInput.addEventListener("input", () => {
-				items[idx]!.name = nameInput.value;
-				this.saveDebounced();
-			});
-
-			const kwInput = fields.createEl("input", { type: "text" });
-			kwInput.className = "cookbook-cat-keywords";
-			kwInput.placeholder = options.keywordsPlaceholder ?? "Keywords, comma-separated";
-			kwInput.value = item.keywords.join(", ");
-			kwInput.addEventListener("input", () => {
-				items[idx]!.keywords = kwInput.value
-					.split(",")
-					.map((s) => s.trim())
-					.filter((s) => s.length > 0);
-				this.saveDebounced();
-			});
-
-			if (options.excludable) {
-				const group = item as IngredientGroup;
-				const exInput = fields.createEl("input", { type: "text" });
-				exInput.className = "cookbook-cat-excludes";
-				// eslint-disable-next-line obsidianmd/ui/sentence-case
-				exInput.placeholder = "Not, e.g. coconut milk";
-				exInput.title =
-					"Terms that look like a match but are not, such as coconut milk in the dairy group";
-				exInput.value = group.excludeKeywords?.join(", ") ?? "";
-				exInput.addEventListener("input", () => {
-					const parsed = exInput.value
-						.split(",")
-						.map((s) => s.trim())
-						.filter((s) => s.length > 0);
-					(items[idx] as IngredientGroup).excludeKeywords =
-						parsed.length > 0 ? parsed : undefined;
-					this.saveDebounced();
-				});
-			}
-
-			const actions = row.createDiv({ cls: "cookbook-cat-actions" });
-
-			if (options.reorderable) {
-				if (idx > 0) {
-					mkBtn(actions, "arrow-up", "Move up").addEventListener("click", () => {
-						[items[idx - 1], items[idx]] = [items[idx]!, items[idx - 1]!];
-						void this.plugin.saveSettings();
-						rerender();
-					});
-				}
-				if (idx < items.length - 1) {
-					mkBtn(actions, "arrow-down", "Move down").addEventListener("click", () => {
-						[items[idx], items[idx + 1]] = [items[idx + 1]!, items[idx]!];
-						void this.plugin.saveSettings();
-						rerender();
-					});
-				}
-			}
-
-			mkBtn(actions, "trash", "Remove", true).addEventListener("click", () => {
-				items.splice(idx, 1);
-				void this.plugin.saveSettings();
-				rerender();
-			});
-		});
-
-		new Setting(container).addButton((b) =>
-			b
-				.setButtonText(options.addLabel)
-				.setCta()
-				.onClick(() => {
-					items.push({ name: "", keywords: [] });
-					void this.plugin.saveSettings();
-					rerender();
-				}),
-		);
+	getControlValue(key: string): unknown {
+		const settings = this.plugin.settings;
+		const codec = CODECS[key as keyof CookbookSettings];
+		return codec ? codec.get(settings) : (settings as unknown as Record<string, unknown>)[key];
 	}
 
-	display(): void {
-		const { containerEl } = this;
-		containerEl.empty();
-
-		new Setting(containerEl)
-			.setName("Properties to display")
-			.setDesc("Frontmatter properties to show in the recipe grid. Comma-separated list.")
-			.addText((text) =>
-				text
-					// eslint-disable-next-line obsidianmd/ui/sentence-case
-					.setPlaceholder("title, cook-time, cover")
-					.setValue(this.plugin.settings.propsToShow.join(", "))
-					.onChange((value) => {
-						this.plugin.settings.propsToShow = value
-							.split(",")
-							.map((s) => s.trim())
-							.filter((s) => s.length > 0);
-						this.saveDebounced();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("Folder for recipes")
-			.setDesc("Path to the folder where your recipes are stored.")
-			.addSearch((search) => {
-				new PathSuggest(this.app, search.inputEl, "folder");
-				search
-					.setPlaceholder("Defaults to entire vault")
-					.setValue(
-						this.plugin.settings.recipesFolder === "." || !this.plugin.settings.recipesFolder
-							? ""
-							: this.plugin.settings.recipesFolder,
-					)
-					.onChange((value) => {
-						this.plugin.settings.recipesFolder = value.trim() || ".";
-						this.saveDebounced();
-					});
-			});
-
-		new Setting(containerEl)
-			.setName("Tag for recipes")
-			.setDesc("The tag that identifies recipe files.")
-			.addText((text) =>
-				text
-					.setPlaceholder("Defaults to #recipe")
-					.setValue(this.plugin.settings.recipesTag ?? "#recipe")
-					.onChange((value) => {
-						const tag = (value ?? "#recipe").trim();
-						this.plugin.settings.recipesTag = tag.startsWith("#") ? tag : `#${tag}`;
-						this.saveDebounced();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("Cook-soon property")
-			.setDesc(
-				// eslint-disable-next-line obsidianmd/ui/sentence-case
-				"The frontmatter property used to mark recipes as cook-soon. Change this if your vault uses a different key (e.g. make-soon).",
-			)
-			.addText((text) =>
-				text
-					// eslint-disable-next-line obsidianmd/ui/sentence-case
-					.setPlaceholder("cook-soon")
-					.setValue(this.plugin.settings.cookSoonProp)
-					.onChange((value) => {
-						this.plugin.settings.cookSoonProp = value.trim() || "cook-soon";
-						this.saveDebounced();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("Cover image property")
-			.setDesc(
-				// eslint-disable-next-line obsidianmd/ui/sentence-case
-				"The frontmatter property used as the recipe cover image. Accepts a URL, a vault path, or a wikilink. Change this if your vault uses a different key (e.g. thumbnail, banner).",
-			)
-			.addText((text) =>
-				text
-					// eslint-disable-next-line obsidianmd/ui/sentence-case
-					.setPlaceholder("cover")
-					.setValue(this.plugin.settings.coverProp)
-					.onChange((value) => {
-						this.plugin.settings.coverProp = value.trim() || "cover";
-						this.saveDebounced();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("Ignored files and folders")
-			.setDesc(
-				"Files or folders to exclude from the recipe library. Folders exclude all files inside them.",
-			);
-
-		const ignoreContainer = containerEl.createDiv({ cls: "cookbook-ignore-container" });
-
-		const renderIgnoreChips = () => {
-			ignoreContainer.empty();
-
-			const chips = ignoreContainer.createDiv({ cls: "cookbook-ignore-chips" });
-			for (const p of this.plugin.settings.ignorePaths) {
-				const chip = chips.createDiv({ cls: "cookbook-ignore-chip" });
-				chip.createSpan({ text: p });
-				const removeBtn = chip.createEl("button");
-				removeBtn.title = "Remove";
-				setIcon(removeBtn, "x");
-				removeBtn.addEventListener("click", () => {
-					this.plugin.settings.ignorePaths = this.plugin.settings.ignorePaths.filter(
-						(x) => x !== p,
-					);
-					void this.plugin.saveSettings();
-					renderIgnoreChips();
-				});
-			}
-
-			const addRow = ignoreContainer.createDiv({ cls: "cookbook-ignore-add" });
-			const input = addRow.createEl("input", { type: "text" });
-			input.placeholder = "Add file or folder…";
-			new PathSuggest(this.app, input, "any");
-
-			const addBtn = addRow.createEl("button", { text: "Add" });
-			const doAdd = () => {
-				const val = input.value.trim();
-				if (!val || this.plugin.settings.ignorePaths.includes(val)) {
-					input.value = "";
-					return;
-				}
-				this.plugin.settings.ignorePaths = [...this.plugin.settings.ignorePaths, val];
-				void this.plugin.saveSettings();
-				renderIgnoreChips();
-			};
-			addBtn.addEventListener("click", doAdd);
-			input.addEventListener("keydown", (e) => {
-				if (e.key === "Enter") {
-					e.preventDefault();
-					doAdd();
-				}
-			});
-		};
-
-		renderIgnoreChips();
-
-		new Setting(containerEl)
-			.setName("Preferred volume unit")
-			.setDesc(
-				"Unit to display when aggregating volume ingredients across recipes. Auto uses whichever unit appears first.",
-			)
-			.addDropdown((dd) => {
-				dd.addOption("", "Auto");
-				for (const u of ["ml", "tsp", "tbsp", "cups", "pt", "l"]) dd.addOption(u, u);
-				dd.setValue(this.plugin.settings.preferredVolumeUnit ?? "");
-				dd.onChange((value) => {
-					this.plugin.settings.preferredVolumeUnit = value || undefined;
-					void this.plugin.saveSettings();
-				});
-			});
-
-		new Setting(containerEl)
-			.setName("Preferred weight unit")
-			.setDesc(
-				"Unit to display when aggregating weight ingredients across recipes. Auto uses whichever unit appears first.",
-			)
-			.addDropdown((dd) => {
-				dd.addOption("", "Auto");
-				for (const u of ["g", "kg", "oz", "lb"]) dd.addOption(u, u);
-				dd.setValue(this.plugin.settings.preferredWeightUnit ?? "");
-				dd.onChange((value) => {
-					this.plugin.settings.preferredWeightUnit = value || undefined;
-					void this.plugin.saveSettings();
-				});
-			});
-
-		new Setting(containerEl)
-			.setName("Hide checked items")
-			.setDesc(
-				"When enabled, items disappear from the shopping list as soon as they are checked off.",
-			)
-			.addToggle((toggle) =>
-				toggle.setValue(this.plugin.settings.hideCheckedItems).onChange((value) => {
-					this.plugin.settings.hideCheckedItems = value;
-					void this.plugin.saveSettings();
-				}),
-			);
-
-		new Setting(containerEl)
-			.setName("Shopping list vault file")
-			.setDesc(
-				// eslint-disable-next-line obsidianmd/ui/sentence-case
-				"If set, the shopping list is saved to this markdown file in your vault instead of plugin storage. Leave empty to use internal storage.",
-			)
-			.addSearch((search) => {
-				new PathSuggest(this.app, search.inputEl, "any");
-				search
-					// eslint-disable-next-line obsidianmd/ui/sentence-case
-					.setPlaceholder("e.g. shopping-list.md")
-					.setValue(this.plugin.settings.shoppingListFilePath ?? "")
-					.onChange((value) => {
-						this.plugin.settings.shoppingListFilePath = value.trim() || undefined;
-						this.saveDebounced();
-					});
-			});
-
-		new Setting(containerEl)
-			.setName("Ingredient groups")
-			.setDesc(
-				// eslint-disable-next-line obsidianmd/ui/sentence-case
-				"Named groups used to filter recipes by dietary need (e.g. exclude dairy, gluten). Each group's keywords are matched against recipe ingredients.",
-			)
-			.setHeading()
-			.addButton((b) =>
-				b.setButtonText("Restore defaults").onClick(() => {
-					this.plugin.settings.ingredientGroups = cloneDefaultSettings().ingredientGroups;
-					void this.plugin.saveSettings();
-					this.display();
-				}),
-			);
-
-		const ingredientGroupsContainer = containerEl.createDiv();
-		this.renderCategoryEditor(
-			ingredientGroupsContainer,
-			() => this.plugin.settings.ingredientGroups,
-			{ namePlaceholder: "Name (e.g. Dairy)", addLabel: "Add group", excludable: true },
-		);
-
-		new Setting(containerEl)
-			.setName("Shopping list categories")
-			.setDesc(
-				"Define categories to group shopping list items. Each item goes to the category with the most specific matching keyword. Drag categories in the shopping list view to reorder them.",
-			)
-			.setHeading()
-			.addButton((b) =>
-				b.setButtonText("Restore defaults").onClick(() => {
-					this.plugin.settings.shoppingCategories = cloneDefaultSettings().shoppingCategories;
-					void this.plugin.saveSettings();
-					this.display();
-				}),
-			);
-
-		const categoriesContainer = containerEl.createDiv();
-		this.renderCategoryEditor(
-			categoriesContainer,
-			() => this.plugin.settings.shoppingCategories,
-			{ namePlaceholder: "Name (e.g. Produce)", addLabel: "Add category", reorderable: true },
-		);
-
-		new Setting(containerEl)
-			.setName("Store layouts")
-			.setDesc(
-				"A route through one shop: the order its aisles are walked. Reorder a route by dragging categories in the shopping list itself — switching shops there re-sorts the list.",
-			)
-			.setHeading();
-
-		const storesContainer = containerEl.createDiv();
-		this.renderStoreEditor(storesContainer);
-
-		this.renderCookingSettings(containerEl);
+	setControlValue(key: string, value: unknown): void {
+		const settings = this.plugin.settings;
+		const codec = CODECS[key as keyof CookbookSettings];
+		if (codec) codec.set(settings, value);
+		else (settings as unknown as Record<string, unknown>)[key] = value;
+		this.saveSoon();
 	}
 
-	/** Cook-together sessions, prep techniques, ingredient aliases and overlap. */
-	private renderCookingSettings(containerEl: HTMLElement): void {
+	// ─── Definitions ─────────────────────────────────────────────────────────
+
+	getSettingDefinitions(): SettingDefinitionItem[] {
 		const { settings } = this.plugin;
+		const defaults = () => cloneDefaultSettings();
+		const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
-		new Setting(containerEl).setName("Cooking sessions").setHeading();
-
-		new Setting(containerEl)
-			.setName("Cook-together property")
-			.setDesc("The frontmatter property that marks recipes to cook in one session.")
-			.addText((text) =>
-				text
-					// eslint-disable-next-line obsidianmd/ui/sentence-case
-					.setPlaceholder("cook-together")
-					.setValue(settings.cookTogetherProp)
-					.onChange((value) => {
-						settings.cookTogetherProp = value.trim() || "cook-together";
-						this.saveDebounced();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("Session folder")
-			.setDesc("Where cooking session notes are written. One note per day, regenerated in place.")
-			.addSearch((search) => {
-				new PathSuggest(this.app, search.inputEl, "folder");
-				search
-					// eslint-disable-next-line obsidianmd/ui/sentence-case
-					.setPlaceholder("recipes/cook sessions")
-					.setValue(settings.cookSessionFolder)
-					.onChange((value) => {
-						settings.cookSessionFolder = value.trim();
-						this.saveDebounced();
-					});
-			});
-
-		new Setting(containerEl)
-			.setName("Prep techniques")
-			.setDesc(
-				"Tag a technique on an ingredient line with #prefix/name, e.g. #prep/dice. Words listed here count as the technique on untagged lines. The order is the order of the prep list in a cooking session.",
-			)
-			.setHeading()
-			.addButton((b) =>
-				b.setButtonText("Restore defaults").onClick(() => {
-					settings.techniques = cloneDefaultSettings().techniques;
-					void this.plugin.saveSettings();
-					this.display();
-				}),
-			);
-
-		new Setting(containerEl)
-			.setName("Technique tag prefix")
-			.setDesc("The parent tag for techniques. Changing it does not rewrite existing tags.")
-			.addText((text) =>
-				text
-					// eslint-disable-next-line obsidianmd/ui/sentence-case
-					.setPlaceholder("prep")
-					.setValue(settings.techniqueTagPrefix)
-					.onChange((value) => {
-						settings.techniqueTagPrefix = value.replace(/^#/, "").replace(/\/+$/, "").trim() || "prep";
-						this.saveDebounced();
-					}),
-			);
-
-		const techniquesContainer = containerEl.createDiv();
-		this.renderCategoryEditor(techniquesContainer, () => settings.techniques, {
-			namePlaceholder: "Name (e.g. dice)",
-			keywordsPlaceholder: "Words that mean it, e.g. diced, cubed",
-			addLabel: "Add technique",
-			reorderable: true,
-		});
-
-		new Setting(containerEl)
-			.setName("Ingredient aliases")
-			.setDesc(
-				"Names that mean the same ingredient. Lines using any of them merge on the shopping list, count as overlap and match ingredient filters.",
-			)
-			.setHeading()
-			.addButton((b) =>
-				b.setButtonText("Restore defaults").onClick(() => {
-					settings.ingredientAliases = cloneDefaultSettings().ingredientAliases;
-					void this.plugin.saveSettings();
-					this.display();
-				}),
-			);
-
-		const aliasesContainer = containerEl.createDiv();
-		const renderAliases = () =>
-			this.renderCategoryEditor(aliasesContainer, () => settings.ingredientAliases, {
-				namePlaceholder: "Name (e.g. scallion)",
-				keywordsPlaceholder: "Other names, e.g. green onion, spring onion",
-				addLabel: "Add alias",
-			});
-		renderAliases();
-
-		new Setting(containerEl)
-			.setName("Ingredient names in your recipes")
-			.setDesc("Find names that are really one ingredient and merge them into the aliases above.");
-		renderIngredientNamesPanel(containerEl.createDiv(), this.plugin, renderAliases);
-
-		new Setting(containerEl).setName("Overlap").setHeading();
-
-		new Setting(containerEl)
-			.setName("Staple ingredients")
-			.setDesc(
-				"Ingredients nearly every recipe uses. They are ignored when finding recipes that cook well together. Comma-separated.",
-			)
-			.addTextArea((text) =>
-				text.setValue(settings.stapleIngredients.join(", ")).onChange((value) => {
-					settings.stapleIngredients = commaList(value);
-					this.saveDebounced();
-				}),
-			);
-
-		new Setting(containerEl)
-			.setName("Ignored aisles")
-			.setDesc("Shopping categories whose ingredients don't count as overlap. Comma-separated.")
-			.addText((text) =>
-				text.setValue(settings.overlapIgnoreCategories.join(", ")).onChange((value) => {
-					settings.overlapIgnoreCategories = commaList(value);
-					this.saveDebounced();
-				}),
-			);
+		return [
+			{
+				type: "group",
+				heading: "Recipes",
+				items: [
+					{
+						name: "Properties to display",
+						desc: "Frontmatter properties to show in the recipe grid. Comma-separated list.",
+						control: { type: "text", key: "propsToShow", placeholder: "title, cook-time, cover" },
+					},
+					{
+						name: "Folder for recipes",
+						desc: "Path to the folder where your recipes are stored.",
+						control: { type: "folder", key: "recipesFolder", placeholder: "Defaults to entire vault" },
+					},
+					{
+						name: "Tag for recipes",
+						desc: "The tag that identifies recipe files.",
+						control: { type: "text", key: "recipesTag", placeholder: "Defaults to #recipe" },
+					},
+					{
+						name: "Cook-soon property",
+						desc: "The frontmatter property used to mark recipes as cook-soon. Change this if your vault uses a different key (such as make-soon).",
+						control: { type: "text", key: "cookSoonProp", placeholder: "cook-soon" },
+					},
+					{
+						name: "Cover image property",
+						desc: "The frontmatter property used as the recipe cover image. Accepts a URL, a vault path, or a wikilink. Change this if your vault uses a different key (such as thumbnail or banner).",
+						control: { type: "text", key: "coverProp", placeholder: "cover" },
+					},
+				],
+			},
+			{
+				type: "list",
+				heading: "Ignored files and folders",
+				emptyState: "Nothing is ignored. Ignoring a folder ignores every file inside it.",
+				items: settings.ignorePaths.map((path) => ({ name: path })),
+				onDelete: (index) => {
+					settings.ignorePaths = settings.ignorePaths.filter((_, i) => i !== index);
+					this.saveNow();
+					this.refresh();
+				},
+				addItem: {
+					name: "Ignore a file or folder",
+					action: () =>
+						new PathPickerModal(this.app, (path) => {
+							if (settings.ignorePaths.includes(path)) return;
+							settings.ignorePaths = [...settings.ignorePaths, path];
+							this.saveNow();
+							this.refresh();
+						}).open(),
+				},
+			},
+			{
+				type: "group",
+				heading: "Shopping list",
+				items: [
+					{
+						name: "Preferred volume unit",
+						desc: "Unit to display when aggregating volume ingredients across recipes. Auto uses whichever unit appears first.",
+						control: { type: "dropdown", key: "preferredVolumeUnit", options: unitOptions(VOLUME_UNITS) },
+					},
+					{
+						name: "Preferred weight unit",
+						desc: "Unit to display when aggregating weight ingredients across recipes. Auto uses whichever unit appears first.",
+						control: { type: "dropdown", key: "preferredWeightUnit", options: unitOptions(WEIGHT_UNITS) },
+					},
+					{
+						name: "Hide checked items",
+						desc: "When enabled, items disappear from the shopping list as soon as they are checked off.",
+						control: { type: "toggle", key: "hideCheckedItems" },
+					},
+					{
+						name: "Shopping list vault file",
+						desc: "If set, the shopping list is saved to this Markdown file in your vault instead of plugin storage. Leave empty to use internal storage.",
+						control: { type: "file", key: "shoppingListFilePath", placeholder: "shopping-list.md" },
+					},
+					{
+						type: "page",
+						name: "Shopping list categories",
+						desc: "Each item goes to the category with the most specific matching keyword.",
+						displayValue: count(settings.shoppingCategories.length, "category", "categories"),
+						items: [
+							keywordList(this, {
+								getItems: () => settings.shoppingCategories,
+								restoreDefaults: () => {
+									settings.shoppingCategories = defaults().shoppingCategories;
+								},
+								newItemName: "New category",
+								addLabel: "Add category",
+								emptyState: "No categories. Every item will be uncategorized.",
+								namePlaceholder: "Name (e.g. Produce)",
+								reorderable: true,
+							}),
+						],
+					},
+					{
+						type: "page",
+						name: "Store layouts",
+						desc: "A route through one shop: the order its aisles are walked. Reorder a route by dragging categories in the shopping list itself.",
+						displayValue: count(settings.storeLayouts.length, "store", "stores"),
+						items: storeLayoutItems(this),
+					},
+					{
+						type: "page",
+						name: "Ingredient groups",
+						desc: "Named groups used to filter recipes by dietary need (for example, no dairy or no gluten).",
+						displayValue: count(settings.ingredientGroups.length, "group", "groups"),
+						items: [
+							keywordList(this, {
+								getItems: () => settings.ingredientGroups,
+								restoreDefaults: () => {
+									settings.ingredientGroups = defaults().ingredientGroups;
+								},
+								newItemName: "New group",
+								addLabel: "Add group",
+								emptyState: "No groups.",
+								namePlaceholder: "Name (e.g. Dairy)",
+								excludable: true,
+							}),
+						],
+					},
+				],
+			},
+			{
+				type: "group",
+				heading: "Cooking sessions",
+				items: [
+					{
+						name: "Cook-together property",
+						desc: "The frontmatter property that marks recipes to cook in one session.",
+						control: { type: "text", key: "cookTogetherProp", placeholder: "cook-together" },
+					},
+					{
+						name: "Session folder",
+						desc: "Where cooking session notes are written. One note per day, regenerated in place.",
+						control: { type: "folder", key: "cookSessionFolder", placeholder: "recipes/cook sessions" },
+					},
+					{
+						type: "page",
+						name: "Prep techniques",
+						desc: "Tag a technique on an ingredient line with #prefix/name, such as #prep/dice. The order here is the order of the prep list in a cooking session.",
+						displayValue: count(settings.techniques.length, "technique", "techniques"),
+						items: [
+							{
+								type: "group",
+								items: [
+									{
+										name: "Technique tag prefix",
+										desc: "The parent tag for techniques. Changing it does not rewrite existing tags.",
+										control: { type: "text", key: "techniqueTagPrefix", placeholder: "prep" },
+									},
+								],
+							},
+							keywordList(this, {
+								getItems: () => settings.techniques,
+								restoreDefaults: () => {
+									settings.techniques = defaults().techniques;
+								},
+								newItemName: "new technique",
+								addLabel: "Add technique",
+								emptyState: "No techniques. Only tagged lines will count.",
+								namePlaceholder: "Name (e.g. dice)",
+								keywordsPlaceholder: "Words that mean it, e.g. diced, cubed",
+								reorderable: true,
+							}),
+						],
+					},
+				],
+			},
+			{
+				type: "group",
+				heading: "Overlap",
+				items: [
+					{
+						type: "page",
+						name: "Ingredient aliases",
+						desc: "Names that mean the same ingredient. They merge on the shopping list, count as overlap and match ingredient filters.",
+						displayValue: count(settings.ingredientAliases.length, "alias", "aliases"),
+						items: [
+							keywordList(this, {
+								getItems: () => settings.ingredientAliases,
+								restoreDefaults: () => {
+									settings.ingredientAliases = defaults().ingredientAliases;
+								},
+								newItemName: "new alias",
+								addLabel: "Add alias",
+								emptyState: "No aliases.",
+								namePlaceholder: "Name (e.g. scallion)",
+								keywordsPlaceholder: "Other names, e.g. green onion, spring onion",
+							}),
+							{
+								type: "group",
+								heading: "Ingredient names in your recipes",
+								items: [
+									{
+										name: "Find duplicates",
+										desc: "Find names that are really one ingredient and merge them into the aliases above.",
+										searchable: true,
+										render: (setting: Setting) => this.renderNamesPanel(setting),
+									},
+								],
+							},
+						],
+					},
+					{
+						name: "Staple ingredients",
+						desc: "Ingredients nearly every recipe uses. They are ignored when finding recipes that cook well together. Comma-separated.",
+						control: { type: "textarea", key: "stapleIngredients" },
+					},
+					{
+						name: "Ignored aisles",
+						desc: "Shopping categories whose ingredients don't count as overlap. Comma-separated.",
+						control: { type: "text", key: "overlapIgnoreCategories" },
+					},
+				],
+			},
+		];
 	}
 
-	private renderStoreEditor(container: HTMLElement): void {
-		container.empty();
-		const { settings } = this.plugin;
-		const rerender = () => this.renderStoreEditor(container);
-
-		new Setting(container).setName("Active store").addDropdown((dd) => {
-			for (const l of settings.storeLayouts) dd.addOption(l.name, l.name);
-			dd.setValue(settings.activeStoreLayout ?? settings.storeLayouts[0]?.name ?? "");
-			dd.onChange((value) => {
-				settings.activeStoreLayout = value;
-				void this.plugin.saveSettings();
-			});
-		});
-
-		settings.storeLayouts.forEach((layout, idx) => {
-			const row = container.createDiv({ cls: "cookbook-cat-row" });
-			const fields = row.createDiv({ cls: "cookbook-cat-fields" });
-
-			const nameInput = fields.createEl("input", { type: "text" });
-			nameInput.className = "cookbook-cat-name";
-			// eslint-disable-next-line obsidianmd/ui/sentence-case
-			nameInput.placeholder = "Name (e.g. Tesco Extra)";
-			nameInput.value = layout.name;
-			nameInput.addEventListener("input", () => {
-				const previous = settings.storeLayouts[idx]!.name;
-				settings.storeLayouts[idx]!.name = nameInput.value;
-				if (settings.activeStoreLayout === previous) {
-					settings.activeStoreLayout = nameInput.value;
-				}
-				this.saveDebounced();
-			});
-
-			fields.createSpan({
-				cls: "cookbook-store-summary",
-				text: `${layout.aisleOrder.length} aisles`,
-			});
-
-			const actions = row.createDiv({ cls: "cookbook-cat-actions" });
-
-			const dup = actions.createEl("button");
-			dup.title = "Duplicate";
-			setIcon(dup, "copy");
-			dup.addEventListener("click", () => {
-				// A new shop is nearly always a tweak of a route you already walk
-				settings.storeLayouts.splice(idx + 1, 0, {
-					name: `${layout.name} copy`,
-					aisleOrder: [...layout.aisleOrder],
-				});
-				void this.plugin.saveSettings();
-				rerender();
-			});
-
-			const del = actions.createEl("button");
-			del.title = "Remove";
-			del.addClass("is-danger");
-			setIcon(del, "trash");
-			del.disabled = settings.storeLayouts.length <= 1;
-			del.addEventListener("click", () => {
-				const [removed] = settings.storeLayouts.splice(idx, 1);
-				if (settings.activeStoreLayout === removed?.name) {
-					settings.activeStoreLayout = settings.storeLayouts[0]?.name;
-				}
-				void this.plugin.saveSettings();
-				rerender();
-			});
-		});
-
-		new Setting(container).addButton((b) =>
-			b
-				.setButtonText("Add store")
-				.setCta()
-				.onClick(() => {
-					const layout: StoreLayout = {
-						name: "New store",
-						aisleOrder: this.plugin.settings.shoppingCategories.map((c) => c.name),
-					};
-					this.plugin.settings.storeLayouts.push(layout);
-					void this.plugin.saveSettings();
-					rerender();
-				}),
-		);
+	private renderNamesPanel(setting: Setting): void {
+		setting.settingEl.addClass("cookbook-names-setting");
+		const host = setting.settingEl.createDiv({ cls: "cookbook-names-host" });
+		renderIngredientNamesPanel(host, this.plugin, this.namesState, () => this.refresh());
 	}
 }
