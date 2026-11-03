@@ -74,7 +74,7 @@ function renderNames(
 		mergeIngredientName(plugin.settings.ingredients, source, target);
 		await plugin.saveSettings();
 		new Notice(`“${source}” now counts as “${target.trim()}”.`);
-		onMerged();
+		changed();
 	};
 
 	/** Add a recipe's name to the list, starting from what partial matches suggest. */
@@ -90,7 +90,16 @@ function renderNames(
 		});
 		await plugin.saveSettings();
 		new Notice(`Added “${name}” to ingredients${category === UNCATEGORIZED ? "" : ` in ${category}`}.`);
+		changed();
+	};
+
+	/**
+	 * Redraw after an add or merge. Refreshing the settings page rebuilds the
+	 * ingredient list above but keeps this panel as drawn, so it redraws itself.
+	 */
+	const changed = () => {
 		onMerged();
+		draw();
 	};
 
 	const draw = () => {
