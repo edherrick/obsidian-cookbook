@@ -15,6 +15,8 @@ export interface ShoppingViewDeps {
 	/** Persist a reordered route into the active store layout. */
 	onReorder: (aisleOrder: string[]) => Promise<void>;
 	onSelectStore: (name: string) => Promise<void>;
+	/** Re-read the saved list into the store. */
+	reload: () => Promise<void>;
 }
 
 export class CookbookShoppingView extends ItemView {
@@ -42,10 +44,13 @@ export class CookbookShoppingView extends ItemView {
 
 	async onOpen(): Promise<void> {
 		this.contentEl.empty();
+		const { reload, ...props } = this.deps;
 		this.component = mount(ShoppingListView, {
 			target: this.contentEl,
-			props: { stores: this.stores, ...this.deps },
+			props: { stores: this.stores, ...props },
 		}) as Record<string, unknown>;
+		// The store can be empty if the note wasn't indexed when the plugin loaded
+		void reload();
 	}
 
 	async onClose(): Promise<void> {

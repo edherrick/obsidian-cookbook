@@ -62,15 +62,19 @@ export default class CookbookPlugin extends Plugin {
 			false,
 		);
 
-		// The metadata cache may still be warming up during onload
-		this.app.workspace.onLayoutReady(() => void this.refreshRecipes());
-
-		try {
-			const persisted = await this.shoppingList.load();
-			if (persisted) this.recipeStores.shoppingList.set(persisted);
-		} catch (e) {
-			console.warn("Failed to load shopping list on load", e);
-		}
+		// The vault index and metadata cache may still be warming up during
+		// onload, so the shopping list note might not be findable yet.
+		this.app.workspace.onLayoutReady(() => {
+			void this.refreshRecipes();
+			void this.reloadShoppingListFromStorage();
+			// Registered here so the startup burst of create events is skipped;
+			// this catches the note arriving later, e.g. via sync.
+			this.registerEvent(
+				this.app.vault.on("create", (file) => {
+					if (file instanceof TFile) void this.syncShoppingListFromFile(file);
+				}),
+			);
+		});
 
 		this.registerView(
 			VIEW_TYPE_SHOPPING,
@@ -82,6 +86,7 @@ export default class CookbookPlugin extends Plugin {
 					getActiveStoreLayout: () => this.settings.activeStoreLayout,
 					onReorder: (aisleOrder) => this.saveAisleOrder(aisleOrder),
 					onSelectStore: (name) => this.selectStoreLayout(name),
+					reload: () => this.reloadShoppingListFromStorage(),
 				}),
 		);
 
@@ -358,7 +363,19 @@ export default class CookbookPlugin extends Plugin {
 	}
 
 	saveShoppingList(data: PersistedShoppingList): Promise<void> {
+		// Keep the store current so a reopened view doesn't show stale items
+		this.recipeStores.shoppingList.set(data);
 		return this.shoppingList.save(data);
+	}
+
+	/** Read the saved list into the store. A missing note leaves the store alone. */
+	async reloadShoppingListFromStorage(): Promise<void> {
+		try {
+			const persisted = await this.shoppingList.load();
+			if (persisted) this.recipeStores.shoppingList.set(persisted);
+		} catch (e) {
+			console.warn("cookbook: failed to load shopping list", e);
+		}
 	}
 
 	// ─── Store layouts ───────────────────────────────────────────────────────
