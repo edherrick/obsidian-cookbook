@@ -1,26 +1,23 @@
 import { ItemView, WorkspaceLeaf } from "obsidian";
-import { mount, unmount } from "svelte";
 import ShoppingListView from "./ShoppingListView.svelte";
+import { mountSvelte } from "../../utils/mountSvelte";
 import type { RecipeStores } from "../../recipes/recipeStores";
-import type { PersistedShoppingList, ShoppingCategory, StoreLayout } from "../../types";
+import type { PersistedShoppingList } from "../../types";
 
 export const VIEW_TYPE_SHOPPING = "cookbook-shopping";
 
-/** Everything the shopping list view needs from the plugin. */
+/** Everything the shopping list view needs from the plugin besides the stores. */
 export interface ShoppingViewDeps {
 	saveShoppingList: (data: PersistedShoppingList) => Promise<void>;
-	getShoppingCategories: () => ShoppingCategory[];
-	getStoreLayouts: () => StoreLayout[];
-	getActiveStoreLayout: () => string | undefined;
 	/** Persist a reordered route into the active store layout. */
 	onReorder: (aisleOrder: string[]) => Promise<void>;
 	onSelectStore: (name: string) => Promise<void>;
-	/** Re-read the saved list into the store. */
-	reload: () => Promise<void>;
+	/** Load the saved list if the store has none yet. */
+	loadIfMissing: () => Promise<void>;
 }
 
 export class CookbookShoppingView extends ItemView {
-	private component: Record<string, unknown> | null = null;
+	private destroy: (() => void) | null = null;
 
 	constructor(
 		leaf: WorkspaceLeaf,
@@ -44,19 +41,14 @@ export class CookbookShoppingView extends ItemView {
 
 	async onOpen(): Promise<void> {
 		this.contentEl.empty();
-		const { reload, ...props } = this.deps;
-		this.component = mount(ShoppingListView, {
-			target: this.contentEl,
-			props: { stores: this.stores, ...props },
-		}) as Record<string, unknown>;
+		const { loadIfMissing, ...props } = this.deps;
+		this.destroy = mountSvelte(ShoppingListView, this.contentEl, { stores: this.stores, ...props });
 		// The store can be empty if the note wasn't indexed when the plugin loaded
-		void reload();
+		void loadIfMissing();
 	}
 
 	async onClose(): Promise<void> {
-		if (this.component) {
-			await unmount(this.component);
-			this.component = null;
-		}
+		this.destroy?.();
+		this.destroy = null;
 	}
 }

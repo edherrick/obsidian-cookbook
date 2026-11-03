@@ -5,7 +5,6 @@
 	import type {
 		PersistedShoppingList,
 		ShoppingItem,
-		ShoppingCategory,
 		StoreLayout,
 	} from "../../types";
 	import { assignCategory } from "../../ingredients/categorize";
@@ -14,17 +13,11 @@
 	const {
 		stores,
 		saveShoppingList,
-		getShoppingCategories,
-		getStoreLayouts,
-		getActiveStoreLayout,
 		onReorder,
 		onSelectStore,
 	} = $props<{
 		stores: RecipeStores;
 		saveShoppingList: (data: PersistedShoppingList) => Promise<void>;
-		getShoppingCategories: () => ShoppingCategory[];
-		getStoreLayouts: () => StoreLayout[];
-		getActiveStoreLayout: () => string | undefined;
 		onReorder: (aisleOrder: string[]) => Promise<void>;
 		onSelectStore: (name: string) => Promise<void>;
 	}>();
@@ -41,22 +34,16 @@
 	let dragOver: string | null = $state(null);
 
 	// ─── Store layouts ────────────────────────────────────────────────────────
-	// svelte-ignore state_referenced_locally — accessor props are stable
-	let layouts: StoreLayout[] = $state(getStoreLayouts());
-	// svelte-ignore state_referenced_locally
-	let activeStore = $state(getActiveStoreLayout() ?? getStoreLayouts()[0]?.name ?? "");
-
-	function refreshLayouts() {
-		layouts = getStoreLayouts();
-		activeStore = getActiveStoreLayout() ?? layouts[0]?.name ?? "";
-	}
+	// svelte-ignore state_referenced_locally — stores is a stable reference
+	const settings = stores.settings;
+	let layouts: StoreLayout[] = $derived($settings.storeLayouts);
+	let activeStore = $derived($settings.activeStoreLayout ?? layouts[0]?.name ?? "");
 
 	/**
 	 * Switch shops. Categories the new route does not mention keep their place
 	 * at the bottom — buildGroups appends anything the order list omits.
 	 */
 	async function selectStore(name: string) {
-		activeStore = name;
 		await onSelectStore(name);
 		const layout = layouts.find((l) => l.name === name);
 		if (!layout) return;
@@ -71,19 +58,15 @@
 		customItems = list.items.filter((i) => i.source === "custom");
 		categoryOrder = [...list.categoryOrder];
 		generatedAt = list.generatedAt;
-		refreshLayouts();
 	}
 
 	// svelte-ignore state_referenced_locally — stores is a stable reference
 	const unsubscribe = stores.shoppingList.subscribe(applyList);
 	onDestroy(() => unsubscribe());
 
-	// svelte-ignore state_referenced_locally — stores is a stable reference
-	const hideCheckedItems = stores.hideCheckedItems;
-
 	// ─── Grouped recipe items ─────────────────────────────────────────────────
 	let allItems = $derived([...recipeItems, ...customItems]);
-	let visibleItems = $derived($hideCheckedItems ? allItems.filter((i) => !i.checked) : allItems);
+	let visibleItems = $derived($settings.hideCheckedItems ? allItems.filter((i) => !i.checked) : allItems);
 	let groups = $derived(buildGroups(visibleItems, categoryOrder));
 
 	function buildGroups(
@@ -144,7 +127,7 @@
 				quantity: null,
 				unit: null,
 				checked: false,
-				category: assignCategory(text, getShoppingCategories()),
+				category: assignCategory(text, $settings.shoppingCategories),
 				source: "custom",
 			},
 		];

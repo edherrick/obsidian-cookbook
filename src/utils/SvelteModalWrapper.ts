@@ -1,37 +1,28 @@
 import { App, Modal } from "obsidian";
-import { mount, unmount } from "svelte";
 import type { Component } from "svelte";
+import { mountSvelte } from "./mountSvelte";
 
 export class SvelteModalWrapper extends Modal {
-	private component: Record<string, unknown> | null = null;
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	private readonly ComponentClass: Component<any>;
-	private readonly props: Record<string, unknown>;
+	private destroy: (() => void) | null = null;
 
 	constructor(
 		app: App,
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		ComponentClass: Component<any>,
-		props: Record<string, unknown> = {},
+		private readonly ComponentClass: Component<any>,
+		private readonly props: Record<string, unknown> = {},
 	) {
 		super(app);
-		this.ComponentClass = ComponentClass;
-		this.props = props;
 	}
 
 	onOpen(): void {
-		this.component = mount(this.ComponentClass, {
-			target: this.contentEl,
-			props: {
-				...this.props,
-				close: () => this.close(),
-			},
-		}) as Record<string, unknown>;
+		this.destroy = mountSvelte(this.ComponentClass, this.contentEl, {
+			...this.props,
+			close: () => this.close(),
+		});
 	}
 
 	onClose(): void {
-		if (this.component) {
-			void unmount(this.component);
-		}
+		this.destroy?.();
+		this.destroy = null;
 	}
 }
