@@ -135,7 +135,8 @@ export function recipeMatchesFilters(
 			}
 			case "numeric": {
 				if (!filter.value) continue;
-				const rNum = parseFloat(String(recipe[key] ?? ""));
+				const raw = recipe[key];
+				const rNum = typeof raw === "number" ? raw : typeof raw === "string" ? parseFloat(raw) : NaN;
 				const fNum = parseFloat(filter.value);
 				if (isNaN(rNum) || isNaN(fNum)) continue;
 				if (filter.op === "<" && !(rNum < fNum)) return false;

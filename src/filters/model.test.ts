@@ -23,7 +23,7 @@ function recipe(path: string, fm: Record<string, unknown> = {}): Recipe {
 		title: path,
 		__tags: [],
 		...fm,
-	} as Recipe;
+	};
 }
 
 function ingredients(...texts: string[]): ParsedIngredient[] {

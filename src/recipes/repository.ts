@@ -8,8 +8,7 @@ export interface Recipe {
 	cook_together?: boolean;
 	cook_multiplier: number;
 	title: string;
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	[frontMatterProp: string]: any;
+	[frontMatterProp: string]: unknown;
 	__tags: string[];
 }
 
@@ -102,7 +101,7 @@ async function flushFlag(path: string, value: boolean, app: App, prop: string) {
 	const file = app.vault.getFileByPath(path);
 	if (!file) return;
 	await app.fileManager.processFrontMatter(file, (fm) => {
-		// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+		// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access -- frontmatter is untyped; prop is a user-configured key
 		fm[prop] = value;
 	});
 }

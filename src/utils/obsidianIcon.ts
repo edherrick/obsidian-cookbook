@@ -5,7 +5,7 @@ export function obsidianIcon(node: HTMLElement, iconName: string) {
 	let raf: number | null = null;
 
 	const apply = (name: string) => {
-		raf = requestAnimationFrame(() => {
+		raf = window.requestAnimationFrame(() => {
 			raf = null;
 			setIcon(node, name);
 		});
@@ -15,12 +15,12 @@ export function obsidianIcon(node: HTMLElement, iconName: string) {
 
 	return {
 		update(newName: string) {
-			if (raf !== null) cancelAnimationFrame(raf);
+			if (raf !== null) window.cancelAnimationFrame(raf);
 			node.empty?.();
 			apply(newName);
 		},
 		destroy() {
-			if (raf !== null) cancelAnimationFrame(raf);
+			if (raf !== null) window.cancelAnimationFrame(raf);
 		},
 	};
 }
