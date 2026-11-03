@@ -2,7 +2,7 @@ import type { App } from "obsidian";
 import type { PersistedShoppingList, ShoppingCategory } from "../types";
 import type { Recipe } from "../recipes/repository";
 import type { IngredientCache } from "../ingredients/cache";
-import { assignCategory, UNCATEGORIZED } from "../ingredients/categorize";
+import { UNCATEGORIZED } from "../ingredients/categorize";
 import { aggregateItems } from "../ingredients/aggregate";
 import type { DisplayUnitPrefs } from "../ingredients/aggregate";
 import { roundQty } from "../ingredients/units";
@@ -18,7 +18,7 @@ export interface BuildShoppingListOptions {
 	 * falling back to whatever order the previous list was arranged into.
 	 */
 	existingOrder?: string[];
-	/** Aliases decide which lines are the same ingredient, and its aisle. */
+	/** The ingredient list: which lines are the same ingredient, and its category. */
 	vocab?: Vocabulary;
 }
 
@@ -66,10 +66,7 @@ export async function buildShoppingList(
 					quantity: parsed.quantity !== null ? roundQty(parsed.quantity * multiplier) : null,
 					unit: parsed.unit,
 					checked: false,
-					category: assignCategory(
-						options.vocab?.canonicalText(parsed.text) ?? parsed.text,
-						categories,
-					),
+					category: options.vocab?.categoryFor(parsed.text) ?? UNCATEGORIZED,
 					source: "recipe" as const,
 					recipeTitle: recipe.title,
 					prep: parsed.prep,

@@ -4,6 +4,7 @@ import type CookbookPlugin from "../main";
 import { buildShoppingList } from "./build";
 import { ShoppingListPersistence, parseShoppingListFromMarkdown } from "./persistence";
 import { UNCATEGORIZED } from "../ingredients/categorize";
+import { resolveRoute } from "./route";
 import { VIEW_TYPE_SHOPPING } from "../ui/views/CookbookShoppingView";
 import type { ShoppingViewDeps } from "../ui/views/CookbookShoppingView";
 import type { PersistedShoppingList, StoreLayout } from "../types";
@@ -41,7 +42,8 @@ export class ShoppingListController {
 		const { app, settings, recipeStores } = this.plugin;
 		// The store is kept current by every save and by edits to the note
 		const existing = get(recipeStores.shoppingList);
-		const route = this.activeLayout()?.aisleOrder ?? existing?.categoryOrder ?? [];
+		const layout = this.activeLayout();
+		const route = layout ? resolveRoute(layout.aisleOrder, settings.shoppingCategories) : (existing?.categoryOrder ?? []);
 		const list = await buildShoppingList(app, get(recipeStores.recipes), settings.shoppingCategories, {
 			cache: this.plugin.ingredientCache,
 			unitPrefs: this.plugin.unitPrefs(),
@@ -103,6 +105,19 @@ export class ShoppingListController {
 	}
 
 	// ─── Store layouts ───────────────────────────────────────────────────────
+
+	/**
+	 * Re-sort the loaded list by the active store's route, after the active
+	 * store or its route changes in settings.
+	 */
+	async applyActiveRoute(): Promise<void> {
+		const list = get(this.plugin.recipeStores.shoppingList);
+		const layout = this.activeLayout();
+		if (!list || !layout) return;
+		const categoryOrder = [...resolveRoute(layout.aisleOrder, this.plugin.settings.shoppingCategories), UNCATEGORIZED];
+		if (categoryOrder.join("\n") === list.categoryOrder.join("\n")) return;
+		await this.save({ ...list, categoryOrder });
+	}
 
 	private activeLayout(): StoreLayout | undefined {
 		const { storeLayouts, activeStoreLayout } = this.plugin.settings;

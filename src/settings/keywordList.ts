@@ -1,9 +1,8 @@
 import { setIcon } from "obsidian";
 import type { Setting, SettingDefinitionList } from "obsidian";
-import type { IngredientGroup, KeywordGroup } from "../types";
+import type { KeywordGroup } from "../types";
 import { uniqueName } from "./host";
 import { keywordField } from "./keywordField";
-import type { KeywordField } from "./keywordField";
 import type { SettingsHost } from "./host";
 
 export interface KeywordListOptions {
@@ -20,10 +19,6 @@ export interface KeywordListOptions {
 	/** What the keywords are called: field label, then singular and plural for the count. */
 	keywordsLabel?: string;
 	countNoun?: [string, string];
-	/** Dietary groups only: a second list of terms that must NOT match. */
-	excludable?: boolean;
-	/** Called once an item's name is changed and the name box is left. */
-	onRename?: (from: string, to: string) => void;
 }
 
 /**
@@ -33,7 +28,7 @@ export interface KeywordListOptions {
  */
 const expanded = new WeakSet<KeywordGroup>();
 
-/** An editable list of named keyword groups: categories, groups, techniques, aliases. */
+/** An editable list of named keyword groups, such as prep techniques and the words for each. */
 export function keywordList(host: SettingsHost, opts: KeywordListOptions): SettingDefinitionList {
 	const structural = () => {
 		host.saveNow();
@@ -107,18 +102,6 @@ function renderRow(
 				item.name = value;
 				host.saveSoon();
 			});
-		// Renames are reported once, when the box is left, not per keystroke:
-		// a half-typed name could collide with another item's
-		let nameBefore = item.name;
-		t.inputEl.addEventListener("focus", () => {
-			if (item.name.trim()) nameBefore = item.name;
-		});
-		t.inputEl.addEventListener("change", () => {
-			// A cleared name is mid-edit: keep the old one to rename from
-			if (!item.name.trim()) return;
-			if (item.name !== nameBefore) opts.onRename?.(nameBefore, item.name);
-			nameBefore = item.name;
-		});
 	});
 
 	// Collapsed: a one-line preview. Clicking it opens the row.
@@ -146,21 +129,6 @@ function renderRow(
 		},
 	});
 
-	let excludes: KeywordField | null = null;
-	if (opts.excludable) {
-		const group = item as IngredientGroup;
-		excludes = keywordField(detail, {
-			label: "Doesn't match",
-			title: "Terms that look like a match but are not, such as coconut milk in the dairy group",
-			placeholder: "Coconut milk",
-			get: () => group.excludeKeywords ?? [],
-			set: (value) => {
-				group.excludeKeywords = value.length > 0 ? value : undefined;
-				host.saveSoon();
-			},
-		});
-	}
-
 	// Toggled in place rather than via refresh(), which would rebuild the page
 	const apply = () => {
 		const open = expanded.has(item);
@@ -182,8 +150,5 @@ function renderRow(
 	});
 	apply();
 
-	return () => {
-		keywords.destroy();
-		excludes?.destroy();
-	};
+	return () => keywords.destroy();
 }

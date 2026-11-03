@@ -1,11 +1,21 @@
 import { describe, it, expect } from "vitest";
 import { buildShoppingList } from "./build";
 import { makeApp, recipeFixture } from "../__mocks__/testHelpers";
+import { Vocabulary } from "../vocab/vocabulary";
+import { DEFAULT_SETTINGS } from "../settings/defaults";
 
-const categories = [
-	{ name: "Dairy", keywords: ["milk", "butter"] },
-	{ name: "Produce", keywords: ["garlic", "onion"] },
-];
+const categories = [{ name: "Dairy" }, { name: "Produce" }];
+
+const vocab = new Vocabulary({
+	...DEFAULT_SETTINGS,
+	shoppingCategories: categories,
+	ingredients: [
+		{ name: "milk", otherNames: [], category: "Dairy", groups: [] },
+		{ name: "butter", otherNames: [], category: "Dairy", groups: [] },
+		{ name: "garlic", otherNames: [], category: "Produce", groups: [] },
+		{ name: "onion", otherNames: [], category: "Produce", groups: [] },
+	],
+});
 
 describe("buildShoppingList", () => {
 	it("only includes recipes marked cook_soon", async () => {
@@ -47,6 +57,7 @@ describe("buildShoppingList", () => {
 			app,
 			[recipeFixture("Recipes/Soup.md", { cook_soon: true })],
 			categories,
+			{ vocab },
 		);
 		expect(list.items.find((i) => i.text === "milk")?.category).toBe("Dairy");
 		expect(list.items.find((i) => i.text === "garlic")?.category).toBe("Produce");

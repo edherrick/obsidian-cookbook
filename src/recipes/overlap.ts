@@ -1,13 +1,10 @@
 import type { ParsedIngredient } from "../ingredients/parse";
-import type { ShoppingCategory } from "../types";
 import type { Vocabulary } from "../vocab/vocabulary";
-import { assignCategory } from "../ingredients/categorize";
 import { normalizeIngredientName } from "../ingredients/normalize";
 
 export interface OverlapOptions {
 	vocab: Vocabulary;
-	categories: ShoppingCategory[];
-	/** Aisles whose contents say nothing about overlap — spices, pantry staples. */
+	/** Categories whose contents say nothing about overlap — spices, pantry staples. */
 	ignoreCategories: string[];
 }
 
@@ -20,7 +17,7 @@ export interface OverlapMatch {
 
 /**
  * The ingredients that make a recipe distinctive enough to compare: everything
- * except staples and the ignored aisles. Keyed by the vocabulary's ingredient
+ * except staples and the ignored categories. Keyed by the vocabulary's ingredient
  * key, valued by a short display name ("shredded curly kale" → "curly kale").
  */
 export function distinctiveIngredients(
@@ -32,7 +29,7 @@ export function distinctiveIngredients(
 	for (const ing of ingredients) {
 		if (!ing.text || options.vocab.isStaple(ing.text)) continue;
 		const canonical = options.vocab.canonicalText(ing.text);
-		if (ignore.has(assignCategory(canonical, options.categories))) continue;
+		if (ignore.has(options.vocab.categoryFor(ing.text))) continue;
 		const key = options.vocab.ingredientKey(ing.text);
 		if (key && !keys.has(key)) keys.set(key, normalizeIngredientName(canonical) || canonical);
 	}

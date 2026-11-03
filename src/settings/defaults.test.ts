@@ -8,10 +8,10 @@ describe("default shopping categories", () => {
 		expect(new Set(names).size).toBe(names.length);
 	});
 
-	it("gives every category a name and at least one keyword", () => {
+	it("gives every category a name and at least one ingredient", () => {
 		for (const c of DEFAULT_SETTINGS.shoppingCategories) {
 			expect(c.name.trim()).not.toBe("");
-			expect(c.keywords.length).toBeGreaterThan(0);
+			expect(DEFAULT_SETTINGS.ingredients.some((i) => i.category === c.name)).toBe(true);
 		}
 	});
 });
@@ -22,10 +22,10 @@ describe("default ingredient groups", () => {
 		expect(new Set(names).size).toBe(names.length);
 	});
 
-	it("gives every group a name and at least one keyword", () => {
+	it("gives every group a name and at least one ingredient", () => {
 		for (const g of DEFAULT_SETTINGS.ingredientGroups) {
 			expect(g.name.trim()).not.toBe("");
-			expect(g.keywords.length).toBeGreaterThan(0);
+			expect(DEFAULT_SETTINGS.ingredients.some((i) => i.groups.includes(g.name))).toBe(true);
 		}
 	});
 
@@ -50,24 +50,36 @@ describe("default store layout", () => {
 	});
 });
 
+describe("default ingredients", () => {
+	it("lists every name once, ignoring letter case", () => {
+		const names = DEFAULT_SETTINGS.ingredients.flatMap((i) => [i.name, ...i.otherNames]).map((n) => n.toLowerCase());
+		expect(new Set(names).size).toBe(names.length);
+	});
+
+	it("only uses categories and groups that exist", () => {
+		const categories = new Set(DEFAULT_SETTINGS.shoppingCategories.map((c) => c.name));
+		const groups = new Set(DEFAULT_SETTINGS.ingredientGroups.map((g) => g.name));
+		for (const i of DEFAULT_SETTINGS.ingredients) {
+			if (i.category) expect(categories).toContain(i.category);
+			for (const g of i.groups) expect(groups).toContain(g);
+		}
+	});
+});
+
 describe("cloneDefaultSettings", () => {
 	it("deep-copies the lists so edits cannot corrupt the defaults", () => {
 		const a = cloneDefaultSettings();
-		a.shoppingCategories[0]!.keywords.push("MUTATED");
+		a.shoppingCategories[0]!.name = "MUTATED";
 		a.ingredientGroups[0]!.name = "MUTATED";
+		a.ingredients[0]!.groups.push("MUTATED");
+		a.ingredients[0]!.otherNames.push("MUTATED");
 		a.storeLayouts[0]!.aisleOrder.push("MUTATED");
 
 		const b = cloneDefaultSettings();
-		expect(b.shoppingCategories[0]!.keywords).not.toContain("MUTATED");
+		expect(b.shoppingCategories[0]!.name).not.toBe("MUTATED");
 		expect(b.ingredientGroups[0]!.name).not.toBe("MUTATED");
+		expect(b.ingredients[0]!.groups).not.toContain("MUTATED");
+		expect(b.ingredients[0]!.otherNames).not.toContain("MUTATED");
 		expect(b.storeLayouts[0]!.aisleOrder).not.toContain("MUTATED");
-	});
-
-	it("copies exclusion lists rather than sharing them", () => {
-		const a = cloneDefaultSettings();
-		const dairy = a.ingredientGroups.find((g) => g.name === "Dairy")!;
-		dairy.excludeKeywords!.push("MUTATED");
-		const b = cloneDefaultSettings();
-		expect(b.ingredientGroups.find((g) => g.name === "Dairy")!.excludeKeywords).not.toContain("MUTATED");
 	});
 });

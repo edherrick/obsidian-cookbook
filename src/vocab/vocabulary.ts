@@ -1,13 +1,14 @@
-import type { IngredientAlias, Technique } from "../types";
+import type { Ingredient, ShoppingCategory, Technique } from "../types";
 import type { ParsedIngredient } from "../ingredients/parse";
-import { normalizeIngredientName } from "../ingredients/normalize";
 import { matchKeyword } from "../ingredients/categorize";
+import { IngredientCatalog, singularKey } from "../ingredients/catalog";
 
 export interface VocabularyConfig {
 	techniqueTagPrefix: string;
 	techniques: Technique[];
-	ingredientAliases: IngredientAlias[];
-	stapleIngredients: string[];
+	ingredients: Ingredient[];
+	/** Their order breaks ties when two ingredients in a line are equally specific. */
+	shoppingCategories: ShoppingCategory[];
 }
 
 export interface TechniqueMatch {
@@ -19,68 +20,48 @@ export interface TechniqueMatch {
 	tagged: boolean;
 }
 
-/**
- * Plural-insensitive form of a matching key, so "red apples" and "red apple"
- * are one ingredient. Only ever compared, never shown.
- */
-export function singularKey(key: string): string {
-	return key
-		.split(" ")
-		.map((w) => {
-			if (w.length <= 3 || /(?:ss|us|is)$/.test(w)) return w;
-			if (w.endsWith("ies")) return `${w.slice(0, -3)}y`;
-			if (/(?:sh|ch|x|z|o)es$/.test(w)) return w.slice(0, -2);
-			if (w.endsWith("s")) return w.slice(0, -1);
-			return w;
-		})
-		.join(" ");
-}
+export { singularKey };
 
 /**
- * What the cookbook knows about names: which ingredient names mean the same
- * thing, which prep words are which technique, and which ingredients are
- * staples. Built from settings and rebuilt whenever they change.
+ * What the cookbook knows about names: the ingredient list (which names are
+ * one ingredient, its category, dietary groups, staples) and which prep words
+ * are which technique. Built from settings and rebuilt whenever they change.
  */
 export class Vocabulary {
 	readonly prefix: string;
+	readonly catalog: IngredientCatalog;
 	private readonly techniques: Technique[];
-	private readonly canonicalByKey = new Map<string, string>();
-	private readonly staples: string[];
 
 	constructor(config: VocabularyConfig) {
 		this.prefix = config.techniqueTagPrefix.replace(/^#/, "").replace(/\/+$/, "") || "prep";
 		this.techniques = config.techniques.filter((t) => t.name.trim().length > 0);
-		this.staples = config.stapleIngredients.map((s) => s.trim()).filter((s) => s.length > 0);
-
-		for (const alias of config.ingredientAliases) {
-			const name = alias.name.trim();
-			if (!name) continue;
-			for (const term of [name, ...alias.keywords]) {
-				const key = singularKey(normalizeIngredientName(term));
-				// First definition wins, so a later duplicate can't silently re-route a name
-				if (key && !this.canonicalByKey.has(key)) this.canonicalByKey.set(key, name);
-			}
-		}
+		this.catalog = new IngredientCatalog(
+			config.ingredients,
+			config.shoppingCategories.map((c) => c.name),
+		);
 	}
 
-	/** The name to categorise and display an ingredient by: its alias, else as written. */
+	/** The name to categorise and display an ingredient by: its listed name, else as written. */
 	canonicalText(text: string): string {
-		const key = singularKey(normalizeIngredientName(text));
-		return this.canonicalByKey.get(key) ?? text;
+		return this.catalog.canonicalText(text);
 	}
 
 	/** The key two lines must share to be the same ingredient. */
 	ingredientKey(text: string): string {
-		const canonical = this.canonicalText(text);
-		const key = normalizeIngredientName(canonical) || canonical.toLowerCase().trim();
-		return singularKey(key);
+		return this.catalog.ingredientKey(text);
 	}
 
-	/** Checked as written as well as by key: "dried thyme" loses "dried" in its key. */
+	/** The shopping category for a line, or Uncategorized. */
+	categoryFor(text: string): string {
+		return this.catalog.categoryFor(text);
+	}
+
+	inGroup(text: string, group: string): boolean {
+		return this.catalog.inGroup(text, group);
+	}
+
 	isStaple(text: string): boolean {
-		const written = text.toLowerCase();
-		const key = normalizeIngredientName(this.canonicalText(text));
-		return this.staples.some((s) => matchKeyword(written, s) || matchKeyword(key, s));
+		return this.catalog.isStaple(text);
 	}
 
 	/** Technique names in list (prep) order. */

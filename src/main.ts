@@ -2,7 +2,8 @@ import { Notice, Plugin, TFile, WorkspaceLeaf, debounce } from "obsidian";
 import type { Debouncer } from "obsidian";
 import { get } from "svelte/store";
 import { CookbookSettingTab } from "./settings/settingsTab";
-import { mergeSettings } from "./settings";
+import { convertedData, mergeSettings } from "./settings";
+import { needsIngredientMigration } from "./settings/migrate";
 import type { CookbookSettings } from "./settings";
 import { SvelteModalWrapper } from "./utils/SvelteModalWrapper";
 import { SerialQueue } from "./utils/serialQueue";
@@ -197,7 +198,6 @@ export default class CookbookPlugin extends Plugin {
 			ingredientGroups: this.settings.ingredientGroups,
 			overlap: {
 				vocab: this.vocabulary,
-				categories: this.settings.shoppingCategories,
 				ignoreCategories: this.settings.overlapIgnoreCategories,
 			},
 		}).open();
@@ -228,8 +228,14 @@ export default class CookbookPlugin extends Plugin {
 	// ─── Settings ────────────────────────────────────────────────────────────
 
 	async loadSettings(): Promise<void> {
-		this.settings = mergeSettings(await this.readData());
+		const raw = await this.readData();
+		this.settings = mergeSettings(raw);
 		this.vocabulary = new Vocabulary(this.settings);
+		// Settings from before the ingredient list were converted on load: save
+		// the result once, keeping the old lists alongside
+		if (needsIngredientMigration(raw)) {
+			await this.saveQueue.run(() => this.saveData(convertedData(raw, this.settings)));
+		}
 	}
 
 	saveSettings(): Promise<void> {
@@ -240,6 +246,11 @@ export default class CookbookPlugin extends Plugin {
 			// A fresh object so every subscriber sees the change
 			this.recipeStores.settings.set({ ...this.settings });
 		});
+	}
+
+	/** Re-sort the open shopping list by the active store's aisle order. */
+	applyActiveRoute(): Promise<void> {
+		return this.shopping.applyActiveRoute();
 	}
 
 	/** Plugin data.json, or an empty object on first run. */

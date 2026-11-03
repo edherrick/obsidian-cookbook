@@ -1,26 +1,18 @@
 import type { CookbookSettings } from "./index";
+import type { LegacyKeywordLists } from "../types";
+import { ingredientsFromKeywordLists } from "./migrate";
 
 /**
- * Keyword lists are matched whole-word (see ingredients/categorize.ts), so
- * compound names such as "blueberries" need their own entry — a bare "berry"
- * no longer matches inside a longer word.
+ * The starter ingredient list, written as the keyword lists it began as: it's
+ * far easier to read and extend this way than as hundreds of ingredient
+ * entries. `DEFAULT_SETTINGS.ingredients` is converted from it (see
+ * settings/migrate.ts), the same way a 1.5 vault's settings are.
  *
- * Two separate lists live here and they answer different questions:
- *   ingredientGroups   — "does this recipe contain dairy?"  (dietary tags,
- *                        several may apply at once, order irrelevant)
- *   shoppingCategories — "which aisle is this in?"          (exactly one per
- *                        item, and the order is the walking route)
+ * Words are matched whole-word (see ingredients/categorize.ts), so compound
+ * names such as "blueberries" need their own entry — a bare "berry" doesn't
+ * match inside a longer word.
  */
-export const DEFAULT_SETTINGS: CookbookSettings = {
-	propsToShow: ["title"],
-	shoppingListFilePath: undefined,
-	coverProp: "cover",
-	recipesFolder: ".",
-	recipesTag: "#recipe",
-	cookSoonProp: "cook-soon",
-	ignorePaths: [],
-	hideCheckedItems: false,
-
+export const STARTER_KEYWORD_LISTS: LegacyKeywordLists = {
 	// Dietary groups. `excludeKeywords` carries the terms that look like a match
 	// but are not one — plant milks are not dairy, rice noodles are not gluten.
 	ingredientGroups: [
@@ -203,6 +195,37 @@ export const DEFAULT_SETTINGS: CookbookSettings = {
 		},
 	],
 
+	// Only true synonyms. A merge from the ingredient names panel adds to these.
+	ingredientAliases: [
+		{ name: "scallion", keywords: ["green onion", "spring onion"] },
+		{ name: "cilantro", keywords: ["fresh coriander", "coriander leaves"] },
+		{ name: "chickpeas", keywords: ["garbanzo beans"] },
+		{ name: "powdered sugar", keywords: ["confectioners sugar", "icing sugar"] },
+		{ name: "zucchini", keywords: ["courgette"] },
+		{ name: "eggplant", keywords: ["aubergine"] },
+	],
+
+	// Matched against the line as written, so "dried thyme" is a staple while
+	// fresh thyme still counts.
+	stapleIngredients: [
+		"salt", "black pepper", "olive oil", "vegetable oil", "neutral oil",
+		"oil spray", "water", "butter", "sugar", "garlic powder", "onion powder",
+		"dried thyme", "dried rosemary", "dried oregano", "dried basil",
+		"dried parsley", "dried sage", "ground sage", "red pepper flakes",
+		"crushed red pepper",
+	],
+};
+
+export const DEFAULT_SETTINGS: CookbookSettings = {
+	propsToShow: ["title"],
+	shoppingListFilePath: undefined,
+	coverProp: "cover",
+	recipesFolder: ".",
+	recipesTag: "#recipe",
+	cookSoonProp: "cook-soon",
+	ignorePaths: [],
+	hideCheckedItems: false,
+
 	// One route by default, matching the category order above. Add a layout per
 	// shop and reorder it by dragging categories in the shopping list view.
 	storeLayouts: [
@@ -247,24 +270,10 @@ export const DEFAULT_SETTINGS: CookbookSettings = {
 		{ name: "rinse", keywords: ["rinsed", "drained", "washed"] },
 	],
 
-	// Only true synonyms. A merge from the ingredient names panel adds to these.
-	ingredientAliases: [
-		{ name: "scallion", keywords: ["green onion", "spring onion"] },
-		{ name: "cilantro", keywords: ["fresh coriander", "coriander leaves"] },
-		{ name: "chickpeas", keywords: ["garbanzo beans"] },
-		{ name: "powdered sugar", keywords: ["confectioners sugar", "icing sugar"] },
-		{ name: "zucchini", keywords: ["courgette"] },
-		{ name: "eggplant", keywords: ["aubergine"] },
-	],
-
-	// Matched against the line as written, so "dried thyme" is a staple while
-	// fresh thyme still counts.
-	stapleIngredients: [
-		"salt", "black pepper", "olive oil", "vegetable oil", "neutral oil",
-		"oil spray", "water", "butter", "sugar", "garlic powder", "onion powder",
-		"dried thyme", "dried rosemary", "dried oregano", "dried basil",
-		"dried parsley", "dried sage", "ground sage", "red pepper flakes",
-		"crushed red pepper",
-	],
 	overlapIgnoreCategories: ["Baking & Spices", "Pantry"],
+
+	// Categories and dietary groups are names; the ingredients say which apply
+	shoppingCategories: STARTER_KEYWORD_LISTS.shoppingCategories.map(({ name }) => ({ name })),
+	ingredientGroups: STARTER_KEYWORD_LISTS.ingredientGroups.map(({ name }) => ({ name })),
+	ingredients: ingredientsFromKeywordLists(STARTER_KEYWORD_LISTS),
 };

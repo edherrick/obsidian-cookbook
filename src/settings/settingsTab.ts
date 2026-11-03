@@ -8,7 +8,9 @@ import type { SettingsHost } from "./host";
 import { keywordList } from "./keywordList";
 import { keywordField } from "./keywordField";
 import type { KeywordFieldOptions } from "./keywordField";
-import { renameCategory } from "./renameCategory";
+import { deleteCategory, deleteGroup, renameCategory, renameGroup } from "./renameCategory";
+import { nameList } from "./nameList";
+import { ingredientListItems } from "./ingredientList";
 import { storeLayoutItems } from "./storeLayouts";
 import { PathPickerModal } from "./pathPickerModal";
 import { renderIngredientNamesPanel } from "./ingredientNamesPanel";
@@ -157,6 +159,8 @@ export class CookbookSettingTab extends PluginSettingTab implements SettingsHost
 		if (codec) codec.set(settings, value);
 		else (settings as unknown as Record<string, unknown>)[key] = value;
 		this.saveSoon();
+		// The open shopping list follows the active store's aisle order
+		if (key === "activeStoreLayout") void this.plugin.applyActiveRoute();
 	}
 
 	// ─── Definitions ─────────────────────────────────────────────────────────
@@ -165,6 +169,7 @@ export class CookbookSettingTab extends PluginSettingTab implements SettingsHost
 		const { settings } = this.plugin;
 		const defaults = () => cloneDefaultSettings();
 		const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+		const usage = (n: number) => count(n, "ingredient", "ingredients");
 
 		return [
 			{
@@ -245,52 +250,108 @@ export class CookbookSettingTab extends PluginSettingTab implements SettingsHost
 					},
 					{
 						type: "page",
-						name: "Shopping list categories",
-						desc: "Each item goes to the category with the most specific matching keyword.",
-						displayValue: count(settings.shoppingCategories.length, "category", "categories"),
+						name: "Ingredients",
+						desc: "Every ingredient the cookbook knows: its category, dietary groups, other names, and whether it's a staple.",
+						displayValue: count(settings.ingredients.length, "ingredient", "ingredients"),
 						items: [
-							keywordList(this, {
-								getItems: () => settings.shoppingCategories,
-								restoreDefaults: () => {
-									settings.shoppingCategories = defaults().shoppingCategories;
-								},
-								newItemName: "New category",
-								addLabel: "Add category",
-								emptyState: "No categories. Every item will be uncategorized.",
-								namePlaceholder: "Name (e.g. Produce)",
-								reorderable: true,
-								onRename: (from, to) => {
-									renameCategory(settings, from, to);
-									this.saveSoon();
-								},
-							}),
+							{
+								type: "group",
+								items: [
+									{
+										type: "page",
+										name: "Categories",
+										desc: "Kinds of ingredient, such as Produce or Dairy. The shopping list groups items by them.",
+										displayValue: count(settings.shoppingCategories.length, "category", "categories"),
+										items: [
+											nameList(this, {
+												getItems: () => settings.shoppingCategories,
+												newItemName: "New category",
+												addLabel: "Add category",
+												emptyState: "No categories. Every item will be uncategorized.",
+												namePlaceholder: "Name (e.g. Produce)",
+												reorderable: true,
+												usage: (name) => usage(settings.ingredients.filter((i) => i.category === name).length),
+												onRename: (from, to) => renameCategory(settings, from, to),
+												onDelete: (name) => deleteCategory(settings, name),
+											}),
+										],
+									},
+									{
+										type: "page",
+										name: "Dietary groups",
+										desc: "Groups used to filter recipes by dietary need, such as no dairy or no gluten.",
+										displayValue: count(settings.ingredientGroups.length, "group", "groups"),
+										items: [
+											nameList(this, {
+												getItems: () => settings.ingredientGroups,
+												newItemName: "New group",
+												addLabel: "Add group",
+												emptyState: "No groups.",
+												namePlaceholder: "Name (e.g. Dairy)",
+												usage: (name) => usage(settings.ingredients.filter((i) => i.groups.includes(name)).length),
+												onRename: (from, to) => renameGroup(settings, from, to),
+												onDelete: (name) => deleteGroup(settings, name),
+											}),
+										],
+									},
+									{
+										type: "page",
+										name: "Staples",
+										desc: "Ingredients nearly every recipe uses. They're left out when finding recipes that cook well together.",
+										displayValue: count(settings.ingredients.filter((i) => i.staple).length, "staple", "staples"),
+										items: [
+											{
+												type: "group",
+												items: [
+													{
+														name: "Staple ingredients",
+														desc: "Ingredients nearly every recipe uses, such as salt or olive oil. They're left out when finding recipes that cook well together. Same as the Staple switch on each ingredient.",
+														render: (setting: Setting) =>
+															this.renderPillSetting(setting, {
+																placeholder: "Choose an ingredient",
+																get: () => settings.ingredients.filter((i) => i.staple).map((i) => i.name),
+																set: (value) => {
+																	const staples = new Set(value.map((v) => v.toLowerCase()));
+																	for (const i of settings.ingredients) {
+																		if (staples.has(i.name.toLowerCase())) i.staple = true;
+																		else delete i.staple;
+																	}
+																	this.saveSoon();
+																},
+																choices: {
+																	app: this.app,
+																	items: () => settings.ingredients.map((i) => i.name),
+																	noun: "ingredient",
+																},
+															}),
+													},
+												],
+											},
+										],
+									},
+								],
+							},
+							...ingredientListItems(this),
+							{
+								type: "group",
+								heading: "Ingredient names in your recipes",
+								items: [
+									{
+										name: "Find duplicates and missing ingredients",
+										desc: "Add names your recipes use to the list, or merge names that are one ingredient.",
+										searchable: true,
+										render: (setting: Setting) => this.renderNamesPanel(setting),
+									},
+								],
+							},
 						],
 					},
 					{
 						type: "page",
 						name: "Store layouts",
-						desc: "A route through one shop: the order its aisles are walked. Reorder a route by dragging categories in the shopping list itself.",
+						desc: "The order you walk each shop's aisles. Open a store to reorder its aisles, or drag categories in the shopping list.",
 						displayValue: count(settings.storeLayouts.length, "store", "stores"),
 						items: storeLayoutItems(this),
-					},
-					{
-						type: "page",
-						name: "Ingredient groups",
-						desc: "Named groups used to filter recipes by dietary need (for example, no dairy or no gluten).",
-						displayValue: count(settings.ingredientGroups.length, "group", "groups"),
-						items: [
-							keywordList(this, {
-								getItems: () => settings.ingredientGroups,
-								restoreDefaults: () => {
-									settings.ingredientGroups = defaults().ingredientGroups;
-								},
-								newItemName: "New group",
-								addLabel: "Add group",
-								emptyState: "No groups.",
-								namePlaceholder: "Name (e.g. Dairy)",
-								excludable: true,
-							}),
-						],
 					},
 				],
 			},
@@ -347,53 +408,7 @@ export class CookbookSettingTab extends PluginSettingTab implements SettingsHost
 				heading: "Overlap",
 				items: [
 					{
-						type: "page",
-						name: "Ingredient aliases",
-						desc: "Names that mean the same ingredient. They merge on the shopping list, count as overlap and match ingredient filters.",
-						displayValue: count(settings.ingredientAliases.length, "alias", "aliases"),
-						items: [
-							keywordList(this, {
-								getItems: () => settings.ingredientAliases,
-								restoreDefaults: () => {
-									settings.ingredientAliases = defaults().ingredientAliases;
-								},
-								newItemName: "new alias",
-								addLabel: "Add alias",
-								emptyState: "No aliases.",
-								namePlaceholder: "Name (e.g. scallion)",
-								keywordsPlaceholder: "Other names, e.g. green onion, spring onion",
-								keywordsLabel: "Other names",
-								countNoun: ["other name", "other names"],
-							}),
-							{
-								type: "group",
-								heading: "Ingredient names in your recipes",
-								items: [
-									{
-										name: "Find duplicates",
-										desc: "Find names that are really one ingredient and merge them into the aliases above.",
-										searchable: true,
-										render: (setting: Setting) => this.renderNamesPanel(setting),
-									},
-								],
-							},
-						],
-					},
-					{
-						name: "Staple ingredients",
-						desc: "Ingredients nearly every recipe uses. They are ignored when finding recipes that cook well together.",
-						render: (setting: Setting) =>
-							this.renderPillSetting(setting, {
-								placeholder: "Type or paste ingredients, comma-separated",
-								get: () => settings.stapleIngredients,
-								set: (value) => {
-									settings.stapleIngredients = value;
-									this.saveSoon();
-								},
-							}),
-					},
-					{
-						name: "Ignored aisles",
+						name: "Ignored categories",
 						desc: "Shopping categories whose ingredients don't count as overlap.",
 						render: (setting: Setting) =>
 							this.renderPillSetting(setting, {

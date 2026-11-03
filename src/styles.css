@@ -195,6 +195,26 @@
 	margin-top: var(--size-4-2);
 }
 
+/* Category and group names: how many ingredients use each */
+.cookbook-row-usage {
+	flex: 1 1 auto;
+	font-size: var(--font-ui-small);
+	color: var(--text-muted);
+	white-space: nowrap;
+}
+
+/* Ingredient rows: a label and its control on one line */
+.cookbook-row-field.cookbook-row-inline {
+	flex-direction: row;
+	align-items: center;
+	justify-content: space-between;
+}
+
+.cookbook-row-preview.is-uncategorized {
+	color: var(--text-faint);
+	font-style: italic;
+}
+
 /* "Edit as text" swaps the pills for a plain text box */
 .cookbook-row-textarea {
 	display: none;
@@ -211,12 +231,6 @@
 
 .cookbook-row-field.is-text .cookbook-row-textarea {
 	display: block;
-}
-
-.cookbook-store-summary {
-	font-size: 0.85em;
-	color: var(--text-muted);
-	white-space: nowrap;
 }
 
 /* ─── Technique tag check ───────────────────────────────────────────────── */
@@ -316,4 +330,51 @@
 
 .cookbook-names-actions input {
 	width: 10rem;
+}
+
+/* ─── Text prompt ───────────────────────────────────────────────────────── */
+
+.cookbook-prompt-error {
+	color: var(--text-error);
+	font-size: var(--font-ui-small);
+	min-height: 1em;
+}
+
+/* ─── Store aisles ──────────────────────────────────────────────────────── */
+
+.cookbook-aisle-row {
+	position: relative;
+}
+
+.cookbook-aisle-row .setting-item-info {
+	display: none;
+}
+
+/* The list's delete button is added after the row renders: pin it beside the number */
+.cookbook-aisle-row .setting-item-control > .extra-setting-button {
+	position: absolute;
+	top: var(--size-4-2);
+	right: 0;
+}
+
+.cookbook-aisle-row .setting-item-control {
+	flex: 1 1 auto;
+	min-width: 0;
+	flex-direction: column;
+	align-items: stretch;
+	gap: var(--size-4-2);
+}
+
+.cookbook-aisle-head {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-2);
+}
+
+.cookbook-aisle-label {
+	font-weight: var(--font-semibold);
+}
+
+.cookbook-aisle-number {
+	width: 5em;
 }

@@ -16,31 +16,52 @@ export interface PersistedShoppingList {
 	generatedAt: number;
 }
 
-/**
- * A named list of keywords matched against ingredient text.
- *
- * Two different things in this plugin share that shape. They are kept as
- * separate names because they answer different questions and may yet diverge.
- */
+/** A name and the words that count as it. Used by prep techniques. */
 export interface KeywordGroup {
 	name: string;
 	keywords: string[];
 }
 
-/** A shopping-list aisle. Every item lands in exactly one, chosen in list order. */
-export type ShoppingCategory = KeywordGroup;
+/**
+ * A kind of ingredient (Produce, Dairy & Eggs…). Every ingredient has one;
+ * the shopping list groups items by it.
+ */
+export interface ShoppingCategory {
+	name: string;
+}
 
-/** A dietary group for filtering recipes. A recipe may match several at once. */
-export interface IngredientGroup extends KeywordGroup {
-	/**
-	 * Terms that look like a match but are not one.
-	 *
-	 * Categories arbitrate by keyword specificity because they compete for an
-	 * item; groups do not compete, so nothing can outrank a short keyword. This
-	 * is how "coconut milk" stops counting as Dairy and "rice noodles" stops
-	 * counting as Gluten.
-	 */
-	excludeKeywords?: string[];
+/** A dietary group for filtering recipes (Dairy, Gluten…). An ingredient may be in several. */
+export interface IngredientGroup {
+	name: string;
+}
+
+/**
+ * One ingredient the cookbook knows, and everything said about it. This is
+ * the one place an ingredient is described; categories and dietary groups
+ * only hold names.
+ */
+export interface Ingredient {
+	/** Shown on the shopping list. Also matched as a word in recipe lines. */
+	name: string;
+	/** Other words for the same ingredient. Lines using them merge with it. */
+	otherNames: string[];
+	/** A shopping category name; "" is Uncategorized. */
+	category: string;
+	/** Dietary group names. */
+	groups: string[];
+	/** Used by nearly every recipe, so it says nothing about overlap. */
+	staple?: boolean;
+}
+
+/**
+ * Settings before the ingredient list (1.5 and earlier): every list held its
+ * own keywords. Read only to convert old settings.
+ */
+export interface LegacyKeywordLists {
+	shoppingCategories: KeywordGroup[];
+	ingredientGroups: (KeywordGroup & { excludeKeywords?: string[] })[];
+	ingredientAliases: KeywordGroup[];
+	stapleIngredients: string[];
 }
 
 /**
@@ -51,7 +72,22 @@ export interface IngredientGroup extends KeywordGroup {
  */
 export interface StoreLayout {
 	name: string;
+	/**
+	 * Categories in walking order. Used for categories not in a numbered aisle,
+	 * which come after the aisles on the shopping list.
+	 */
 	aisleOrder: string[];
+	/** The shop's numbered aisles and what's in each. Optional: a store may have none. */
+	aisles?: Aisle[];
+}
+
+/** One numbered aisle in a shop. */
+export interface Aisle {
+	number: number;
+	/** Categories shelved here. */
+	categories: string[];
+	/** Single ingredients this shop keeps here, whatever their category. */
+	ingredients: string[];
 }
 
 /**
@@ -60,6 +96,3 @@ export interface StoreLayout {
  * order of the list is the order prep is done in — peel before you dice.
  */
 export type Technique = KeywordGroup;
-
-/** One canonical ingredient name, and the other names that mean the same thing. */
-export type IngredientAlias = KeywordGroup;

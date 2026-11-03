@@ -1,7 +1,6 @@
 import type { Recipe } from "../recipes/repository";
 import type { ParsedIngredient } from "../ingredients/parse";
 import type { IngredientGroup } from "../types";
-import { matchesGroup } from "../ingredients/categorize";
 import type { Vocabulary } from "../vocab/vocabulary";
 
 export const HAS_INGREDIENT_KEY = "__has-ingredient";
@@ -43,7 +42,10 @@ export type FilterValue =
 export interface FilterContext {
 	ingredientsByPath: Map<string, ParsedIngredient[]>;
 	ingredientGroups: IngredientGroup[];
-	/** With aliases, searching "green onion" also finds a recipe's "scallion". */
+	/**
+	 * The ingredient list. Searching "green onion" also finds a recipe's
+	 * "scallion", and dietary group filters need it to know what's in a group.
+	 */
 	vocab?: Vocabulary;
 }
 
@@ -114,10 +116,9 @@ function containsIngredient(texts: string[], query: string, ctx: FilterContext):
 }
 
 function recipeHasGroup(recipe: Recipe, groupName: string, ctx: FilterContext): boolean {
-	const group = ctx.ingredientGroups.find((g) => g.name === groupName);
-	if (!group) return false;
+	if (!ctx.vocab || !ctx.ingredientGroups.some((g) => g.name === groupName)) return false;
 	const ingredients = ctx.ingredientsByPath.get(recipe.path) ?? [];
-	return ingredients.some((i) => matchesGroup(i.text, group));
+	return ingredients.some((i) => ctx.vocab!.inGroup(i.text, groupName));
 }
 
 export function recipeMatchesFilters(

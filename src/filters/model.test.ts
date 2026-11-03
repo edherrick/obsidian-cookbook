@@ -12,6 +12,7 @@ import {
 import type { FilterContext, FilterValue } from "./model";
 import type { Recipe } from "../recipes/repository";
 import type { ParsedIngredient } from "../ingredients/parse";
+import type { Ingredient } from "../types";
 
 const EXCLUDED = new Set(["path", "__tags", "cook_soon", "cook_multiplier", "title", "tags"]);
 
@@ -30,13 +31,29 @@ function ingredients(...texts: string[]): ParsedIngredient[] {
 	return texts.map((text) => ({ quantity: null, unit: null, text }));
 }
 
+/** A vocabulary over a small ingredient list: each name, in the given groups. */
+function vocabWith(groups: Record<string, string[]>): Vocabulary {
+	const ingredients: Ingredient[] = Object.entries(groups).map(([name, g]) => ({
+		name,
+		otherNames: [],
+		category: "",
+		groups: g,
+	}));
+	return new Vocabulary({ ...DEFAULT_SETTINGS, ingredients });
+}
+
 function ctx(map: Record<string, ParsedIngredient[]> = {}): FilterContext {
 	return {
 		ingredientsByPath: new Map(Object.entries(map)),
-		ingredientGroups: [
-			{ name: "Dairy", keywords: ["milk", "cheese", "butter"] },
-			{ name: "Gluten", keywords: ["flour", "pasta", "bread"] },
-		],
+		ingredientGroups: [{ name: "Dairy" }, { name: "Gluten" }],
+		vocab: vocabWith({
+			milk: ["Dairy"],
+			cheese: ["Dairy"],
+			butter: ["Dairy"],
+			flour: ["Gluten"],
+			pasta: ["Gluten"],
+			bread: ["Gluten"],
+		}),
 	};
 }
 
@@ -235,18 +252,20 @@ describe("initialFilterFor", () => {
 });
 
 describe("recipeMatchesFilters — group exclusions", () => {
-	const dietary: FilterContext["ingredientGroups"] = [
-		{
-			name: "Dairy",
-			keywords: ["milk", "butter", "cream"],
-			excludeKeywords: ["coconut milk", "peanut butter"],
-		},
-	];
+	// Look-alikes are ingredients of their own, outside the group
+	const vocab = vocabWith({
+		milk: ["Dairy"],
+		butter: ["Dairy"],
+		cream: ["Dairy"],
+		"coconut milk": [],
+		"peanut butter": [],
+	});
 
 	function withIngredients(...texts: string[]): FilterContext {
 		return {
 			ingredientsByPath: new Map([["a.md", ingredients(...texts)]]),
-			ingredientGroups: dietary,
+			ingredientGroups: [{ name: "Dairy" }],
+			vocab,
 		};
 	}
 
@@ -271,7 +290,7 @@ describe("recipeMatchesFilters — group exclusions", () => {
 	});
 
 	it("flags a recipe with both peanut butter and real butter", () => {
-		// Exclusions apply per ingredient line, so the real butter still counts
+		// Each line is judged on its own, so the real butter still counts
 		const ctx = withIngredients("2 tbsp peanut butter", "6 tbsp butter");
 		expect(recipeMatchesFilters(recipe("a.md"), hasDairy, ctx)).toBe(true);
 	});

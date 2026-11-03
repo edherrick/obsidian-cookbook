@@ -1,4 +1,4 @@
-import type { IngredientAlias } from "../types";
+import type { Ingredient } from "../types";
 import type { ParsedIngredient } from "../ingredients/parse";
 import type { Vocabulary } from "./vocabulary";
 import { normalizeIngredientName } from "../ingredients/normalize";
@@ -78,27 +78,38 @@ export function likelyDuplicates(names: IngredientName[]): Map<string, string[]>
 }
 
 /**
- * Record that `source` is another name for `target`. The source's own
- * aliases move along with it, so merging never strands a name.
+ * Record that `source` is another name for `target` in the ingredient list.
+ *
+ * If `source` was an ingredient of its own, it's folded in and its other names
+ * move along, so merging never strands a name. If `target` isn't listed yet,
+ * it's added, keeping the source's category and tags.
  */
-export function mergeAlias(aliases: IngredientAlias[], source: string, target: string): void {
+export function mergeIngredientName(ingredients: Ingredient[], source: string, target: string): void {
 	const src = source.trim();
 	const dst = target.trim();
-	if (!src || !dst || src.toLowerCase() === dst.toLowerCase()) return;
+	const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
+	if (!src || !dst || same(src, dst)) return;
 
-	let group = aliases.find((a) => a.name.toLowerCase() === dst.toLowerCase());
-	if (!group) {
-		group = { name: dst, keywords: [] };
-		aliases.push(group);
+	const absorbed = ingredients.find((i) => same(i.name, src));
+
+	let into = ingredients.find((i) => same(i.name, dst));
+	if (!into) {
+		into = {
+			name: dst,
+			otherNames: [],
+			category: absorbed?.category ?? "",
+			groups: [...(absorbed?.groups ?? [])],
+			...(absorbed?.staple ? { staple: true } : {}),
+		};
+		ingredients.push(into);
 	}
+	if (absorbed) ingredients.splice(ingredients.indexOf(absorbed), 1);
 
-	const absorbed = aliases.findIndex((a) => a !== group && a.name.toLowerCase() === src.toLowerCase());
-	const moving = absorbed === -1 ? [src] : [src, ...aliases[absorbed]!.keywords];
-	if (absorbed !== -1) aliases.splice(absorbed, 1);
-
-	for (const name of moving) {
-		if (!group.keywords.some((k) => k.toLowerCase() === name.toLowerCase())) {
-			group.keywords.push(name);
-		}
+	// The source may also be listed as another name elsewhere; it now belongs here
+	for (const other of ingredients) {
+		if (other !== into) other.otherNames = other.otherNames.filter((n) => !same(n, src));
+	}
+	for (const name of [src, ...(absorbed?.otherNames ?? [])]) {
+		if (!same(name, into.name) && !into.otherNames.some((n) => same(n, name))) into.otherNames.push(name);
 	}
 }

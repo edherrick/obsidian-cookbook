@@ -7,7 +7,8 @@
 		ShoppingItem,
 		StoreLayout,
 	} from "../../types";
-	import { assignCategory } from "../../ingredients/categorize";
+	import { IngredientCatalog } from "../../ingredients/catalog";
+	import { groupForStore } from "../../shopping/route";
 	import { formatQty } from "../../ingredients/units";
 
 	const {
@@ -38,10 +39,14 @@
 	const settings = stores.settings;
 	let layouts: StoreLayout[] = $derived($settings.storeLayouts);
 	let activeStore = $derived($settings.activeStoreLayout ?? layouts[0]?.name ?? "");
+	/** Files a typed-in item under its ingredient's category. */
+	let catalog = $derived(
+		new IngredientCatalog($settings.ingredients, $settings.shoppingCategories.map((c) => c.name)),
+	);
 
 	/**
 	 * Switch shops. Categories the new route does not mention keep their place
-	 * at the bottom — buildGroups appends anything the order list omits.
+	 * at the bottom — groupForStore appends anything the order list omits.
 	 */
 	async function selectStore(name: string) {
 		await onSelectStore(name);
@@ -67,32 +72,17 @@
 	// ─── Grouped recipe items ─────────────────────────────────────────────────
 	let allItems = $derived([...recipeItems, ...customItems]);
 	let visibleItems = $derived($settings.hideCheckedItems ? allItems.filter((i) => !i.checked) : allItems);
-	let groups = $derived(buildGroups(visibleItems, categoryOrder));
-
-	function buildGroups(
-		items: ShoppingItem[],
-		order: string[],
-	): { category: string; items: ShoppingItem[] }[] {
-		const byCategory = new Map<string, ShoppingItem[]>();
-		for (const item of items) {
-			const cat = item.category || "Uncategorized";
-			if (!byCategory.has(cat)) byCategory.set(cat, []);
-			byCategory.get(cat)!.push(item);
-		}
-		const result: { category: string; items: ShoppingItem[] }[] = [];
-		for (const cat of order) {
-			const catItems = byCategory.get(cat);
-			if (catItems) {
-				result.push({ category: cat, items: catItems });
-				byCategory.delete(cat);
-			}
-		}
-		// Anything not in the order list goes at the bottom
-		for (const [cat, catItems] of byCategory) {
-			result.push({ category: cat, items: catItems });
-		}
-		return result;
-	}
+	let activeLayout = $derived(layouts.find((l) => l.name === activeStore));
+	/** Numbered aisles for the active store first, then categories in route order. */
+	let groups = $derived(
+		groupForStore(visibleItems, {
+			layout: activeLayout,
+			categoryOrder,
+			ingredientOf: (item) => catalog.ingredientFor(item.text)?.name,
+		}),
+	);
+	/** Only category groups can be reordered; an aisle's number fixes its place. */
+	let categoryGroups = $derived(groups.filter((g) => g.category !== undefined));
 
 	// ─── Persistence ─────────────────────────────────────────────────────────
 	async function persist() {
@@ -127,7 +117,7 @@
 				quantity: null,
 				unit: null,
 				checked: false,
-				category: assignCategory(text, $settings.shoppingCategories),
+				category: catalog.categoryFor(text),
 				source: "custom",
 			},
 		];
@@ -199,7 +189,7 @@
 	 * doing nothing, so the move is anchored to the visible group instead.
 	 */
 	async function moveCategory(category: string, dir: -1 | 1) {
-		const visible = groups.map((g: { category: string }) => g.category);
+		const visible = categoryGroups.map((g) => g.category!);
 		const neighbour = visible[visible.indexOf(category) + dir];
 		if (neighbour === undefined) return;
 		await reorderCategory(category, neighbour);
@@ -292,41 +282,51 @@
 			> from the ribbon icon.
 		</p>
 	{:else}
-		<!-- Recipe ingredient groups (draggable to reorder) -->
-		{#each groups as group, i (group.category)}
+		<!-- Aisles in number order, then categories (draggable to reorder) -->
+		{#each groups as group (group.key)}
+			{@const category = group.category}
+			{@const ci = category === undefined ? -1 : categoryGroups.indexOf(group)}
 			<div
 				class="category-group"
-				class:drag-over={dragOver === group.category}
-				class:dragging={dragSource === group.category}
-				draggable="true"
-				ondragstart={(e) => onDragStart(e, group.category)}
-				ondragover={(e) => onDragOver(e, group.category)}
+				class:aisle-group={category === undefined}
+				class:drag-over={category !== undefined && dragOver === category}
+				class:dragging={category !== undefined && dragSource === category}
+				draggable={category !== undefined}
+				ondragstart={(e) => category !== undefined && onDragStart(e, category)}
+				ondragover={(e) => category !== undefined && onDragOver(e, category)}
 				ondragleave={onDragLeave}
-				ondrop={(e) => onDrop(e, group.category)}
+				ondrop={(e) => category !== undefined && onDrop(e, category)}
 				ondragend={onDragEnd}
 				role="listitem"
 			>
 				<div class="category-header">
-					<span class="drag-handle" use:obsidianIcon={"grip-vertical"} aria-hidden="true"></span>
-					<span class="category-name">{group.category}</span>
+					{#if category !== undefined}
+						<span class="drag-handle" use:obsidianIcon={"grip-vertical"} aria-hidden="true"></span>
+					{/if}
+					<span class="category-name">{group.label}</span>
+					{#if group.detail}
+						<span class="aisle-detail">{group.detail}</span>
+					{/if}
 					<span class="category-count">
 						{group.items.filter((i) => i.checked).length}/{group
 							.items.length}
 					</span>
-					<div class="reorder-btns" role="group" aria-label="Reorder {group.category}">
-						<button
-							class="reorder-btn"
-							aria-label="Move {group.category} up"
-							disabled={i === 0}
-							onclick={() => moveCategory(group.category, -1)}
-						><span use:obsidianIcon={"chevron-up"} aria-hidden="true"></span></button>
-						<button
-							class="reorder-btn"
-							aria-label="Move {group.category} down"
-							disabled={i === groups.length - 1}
-							onclick={() => moveCategory(group.category, 1)}
-						><span use:obsidianIcon={"chevron-down"} aria-hidden="true"></span></button>
-					</div>
+					{#if category !== undefined}
+						<div class="reorder-btns" role="group" aria-label="Reorder {category}">
+							<button
+								class="reorder-btn"
+								aria-label="Move {category} up"
+								disabled={ci === 0}
+								onclick={() => moveCategory(category, -1)}
+							><span use:obsidianIcon={"chevron-up"} aria-hidden="true"></span></button>
+							<button
+								class="reorder-btn"
+								aria-label="Move {category} down"
+								disabled={ci === categoryGroups.length - 1}
+								onclick={() => moveCategory(category, 1)}
+							><span use:obsidianIcon={"chevron-down"} aria-hidden="true"></span></button>
+						</div>
+					{/if}
 				</div>
 				<ul class="item-list">
 					{#each group.items as item (item.id)}
@@ -515,6 +515,25 @@
 		text-transform: uppercase;
 		letter-spacing: 0.04em;
 		font-size: 0.8em;
+	}
+
+	.aisle-group .category-header {
+		cursor: default;
+	}
+
+	.aisle-group .category-name {
+		flex: none;
+	}
+
+	.aisle-detail {
+		flex: 1 1 auto;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		font-weight: normal;
+		font-size: 0.8em;
+		color: var(--text-muted);
 	}
 
 	.category-count {

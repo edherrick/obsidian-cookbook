@@ -1,7 +1,8 @@
 import { Notice, setIcon } from "obsidian";
 import type CookbookPlugin from "../main";
-import { likelyDuplicates, mergeAlias } from "../vocab/names";
+import { likelyDuplicates, mergeIngredientName } from "../vocab/names";
 import type { IngredientName } from "../vocab/names";
+import { UNCATEGORIZED } from "../ingredients/categorize";
 
 let datalistSeq = 0;
 
@@ -12,8 +13,9 @@ export interface IngredientNamesState {
 
 /**
  * Every ingredient name in the library with how many recipes use it. Likely
- * duplicates are suggested; any name can be merged into another, which adds
- * it to the aliases table. Scanning reads every recipe, so it waits for a click.
+ * duplicates are suggested; any name can be merged into another, which makes
+ * it another name of that ingredient. Names not in the ingredient list can be
+ * added to it. Scanning reads every recipe, so it waits for a click.
  */
 export function renderIngredientNamesPanel(
 	container: HTMLElement,
@@ -52,27 +54,55 @@ function renderNames(
 	const datalist = container.createEl("datalist", { attr: { id: listId } });
 	for (const n of names) datalist.createEl("option", { attr: { value: n.name } });
 
-	let onlyDupes = dupes.size > 0;
+	const isListed = (name: string) => plugin.vocabulary.catalog.exact(name) !== undefined;
+	type Show = "duplicates" | "unlisted" | "all";
+	let show: Show = dupes.size > 0 ? "duplicates" : "unlisted";
+
 	const header = container.createDiv({ cls: "cookbook-names-header" });
-	header.createSpan({
-		text: `${names.length} ingredients, ${dupes.size} with likely duplicates.`,
-	});
-	const filterBtn = header.createEl("button");
+	const summary = header.createSpan();
+	const showSelect = header.createEl("select", { cls: "dropdown" });
+	for (const [value, text] of [
+		["duplicates", "Likely duplicates"],
+		["unlisted", "Not in ingredient list"],
+		["all", "All names"],
+	] as const) {
+		showSelect.createEl("option", { value, text });
+	}
 	const list = container.createDiv({ cls: "cookbook-names-list" });
 
 	const merge = async (source: string, target: string) => {
-		mergeAlias(plugin.settings.ingredientAliases, source, target);
+		mergeIngredientName(plugin.settings.ingredients, source, target);
 		await plugin.saveSettings();
 		new Notice(`“${source}” now counts as “${target.trim()}”.`);
 		onMerged();
 	};
 
+	/** Add a recipe's name to the list, starting from what partial matches suggest. */
+	const add = async (name: string) => {
+		const vocab = plugin.vocabulary;
+		const category = vocab.categoryFor(name);
+		plugin.settings.ingredients.push({
+			name,
+			otherNames: [],
+			category: category === UNCATEGORIZED ? "" : category,
+			groups: [...vocab.catalog.groupsFor(name)],
+			...(vocab.isStaple(name) ? { staple: true } : {}),
+		});
+		await plugin.saveSettings();
+		new Notice(`Added “${name}” to ingredients${category === UNCATEGORIZED ? "" : ` in ${category}`}.`);
+		onMerged();
+	};
+
 	const draw = () => {
 		list.empty();
-		filterBtn.setText(onlyDupes ? "Show all" : "Show likely duplicates only");
+		showSelect.value = show;
+		const unlisted = names.filter((n) => !isListed(n.name)).length;
+		summary.setText(`${names.length} names: ${dupes.size} with likely duplicates, ${unlisted} not in your list.`);
 		for (const n of names) {
 			const suggestions = dupes.get(n.key) ?? [];
-			if (onlyDupes && suggestions.length === 0) continue;
+			const listed = isListed(n.name);
+			if (show === "duplicates" && suggestions.length === 0) continue;
+			if (show === "unlisted" && listed) continue;
 
 			const row = list.createDiv({ cls: "cookbook-names-row" });
 			const label = row.createDiv({ cls: "cookbook-names-label" });
@@ -84,6 +114,11 @@ function renderNames(
 			});
 
 			const actions = row.createDiv({ cls: "cookbook-names-actions" });
+			if (!listed) {
+				const addBtn = actions.createEl("button", { text: "Add", cls: "mod-cta" });
+				addBtn.title = "Add to the ingredient list";
+				addBtn.addEventListener("click", () => void add(n.name));
+			}
 			for (const s of suggestions) {
 				const btn = actions.createEl("button", { text: `Merge into ${s}` });
 				btn.addEventListener("click", () => void merge(n.name, s));
@@ -101,8 +136,8 @@ function renderNames(
 		}
 	};
 
-	filterBtn.addEventListener("click", () => {
-		onlyDupes = !onlyDupes;
+	showSelect.addEventListener("change", () => {
+		show = showSelect.value as Show;
 		draw();
 	});
 	draw();
