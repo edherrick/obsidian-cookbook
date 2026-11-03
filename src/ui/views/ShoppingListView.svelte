@@ -228,6 +228,9 @@
 
 	let resetPending = $state(false);
 	let resetTimer: ReturnType<typeof setTimeout> | null = null;
+	onDestroy(() => {
+		if (resetTimer) clearTimeout(resetTimer);
+	});
 
 	function handleResetClick() {
 		if (!resetPending) {

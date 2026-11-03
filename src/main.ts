@@ -1,4 +1,5 @@
 import { Notice, Plugin, TFile, WorkspaceLeaf, debounce } from "obsidian";
+import type { Debouncer } from "obsidian";
 import { get } from "svelte/store";
 import { CookbookSettingTab } from "./settings/settingsTab";
 import { mergeSettings } from "./settings";
@@ -15,8 +16,9 @@ import type { RecipeStores } from "./recipes/recipeStores";
 import { IngredientCache } from "./ingredients/cache";
 import type { ParsedIngredient } from "./ingredients/parse";
 import { buildShoppingList } from "./shopping/build";
+import type { DisplayUnitPrefs } from "./ingredients/aggregate";
 import { UNCATEGORIZED } from "./ingredients/categorize";
-import { ShoppingListPersistence } from "./shopping/persistence";
+import { ShoppingListPersistence, parseShoppingListFromMarkdown } from "./shopping/persistence";
 import type { PersistedShoppingList, StoreLayout } from "./types";
 import { Vocabulary } from "./vocab/vocabulary";
 import { loadCookSession, prepareCookSession, writeCookSessionNote } from "./session/write";
@@ -41,7 +43,7 @@ export default class CookbookPlugin extends Plugin {
 	private ingredientCache = new IngredientCache();
 	private saveQueue = new SerialQueue();
 	private shoppingList: ShoppingListPersistence;
-	private refreshRecipesDebounced: () => void;
+	private refreshRecipesDebounced: Debouncer<[], void>;
 
 	async onload() {
 		await this.loadSettings();
@@ -51,7 +53,7 @@ export default class CookbookPlugin extends Plugin {
 			{
 				app: this.app,
 				getFilePath: () => this.settings.shoppingListFilePath,
-				loadData: async () => ((await this.loadData()) ?? {}) as Record<string, unknown>,
+				loadData: () => this.readData(),
 				saveData: (data) => this.saveData(data),
 			},
 			this.saveQueue,
@@ -156,6 +158,10 @@ export default class CookbookPlugin extends Plugin {
 				void this.syncShoppingListFromFile(file);
 			}),
 		);
+		this.registerEvent(this.app.vault.on("delete", (file) => this.ingredientCache.invalidate(file.path)));
+		this.registerEvent(
+			this.app.vault.on("rename", (_file, oldPath) => this.ingredientCache.invalidate(oldPath)),
+		);
 
 		// Frontmatter and tag edits change which notes count as recipes
 		this.registerEvent(
@@ -166,6 +172,7 @@ export default class CookbookPlugin extends Plugin {
 	}
 
 	onunload() {
+		this.refreshRecipesDebounced.cancel();
 		this.ingredientCache.invalidate();
 	}
 
@@ -226,10 +233,7 @@ export default class CookbookPlugin extends Plugin {
 			this.settings.shoppingCategories,
 			{
 				cache: this.ingredientCache,
-				unitPrefs: {
-					preferredVolumeUnit: this.settings.preferredVolumeUnit,
-					preferredWeightUnit: this.settings.preferredWeightUnit,
-				},
+				unitPrefs: this.unitPrefs(),
 				existingOrder: route,
 				vocab: this.vocabulary,
 			},
@@ -297,10 +301,7 @@ export default class CookbookPlugin extends Plugin {
 	private saveCookSession(session: CookSession, plan: PlanEntry[]): Promise<TFile> {
 		return writeCookSessionNote(this.app, session, plan, {
 			vocab: this.vocabulary,
-			unitPrefs: {
-				preferredVolumeUnit: this.settings.preferredVolumeUnit,
-				preferredWeightUnit: this.settings.preferredWeightUnit,
-			},
+			unitPrefs: this.unitPrefs(),
 		});
 	}
 
@@ -346,7 +347,7 @@ export default class CookbookPlugin extends Plugin {
 		if (file.path !== this.shoppingList.resolvePath()) return;
 		const content = await this.app.vault.read(file);
 		if (this.shoppingList.isOwnWrite(content)) return;
-		const parsed = await this.shoppingList.load();
+		const parsed = parseShoppingListFromMarkdown(content);
 		if (parsed) this.recipeStores.shoppingList.set(parsed);
 	}
 
@@ -404,16 +405,28 @@ export default class CookbookPlugin extends Plugin {
 	// ─── Settings ────────────────────────────────────────────────────────────
 
 	async loadSettings(): Promise<void> {
-		this.settings = mergeSettings(((await this.loadData()) ?? {}) as Record<string, unknown>);
+		this.settings = mergeSettings(await this.readData());
 		this.vocabulary = new Vocabulary(this.settings);
 	}
 
 	saveSettings(): Promise<void> {
 		return this.saveQueue.run(async () => {
-			const existing = ((await this.loadData()) ?? {}) as Record<string, unknown>;
+			const existing = await this.readData();
 			await this.saveData({ ...existing, ...this.settings });
 			this.recipeStores.hideCheckedItems.set(this.settings.hideCheckedItems);
 			this.vocabulary = new Vocabulary(this.settings);
 		});
+	}
+
+	/** Plugin data.json, or an empty object on first run. */
+	private async readData(): Promise<Record<string, unknown>> {
+		return ((await this.loadData()) ?? {}) as Record<string, unknown>;
+	}
+
+	private unitPrefs(): DisplayUnitPrefs {
+		return {
+			preferredVolumeUnit: this.settings.preferredVolumeUnit,
+			preferredWeightUnit: this.settings.preferredWeightUnit,
+		};
 	}
 }

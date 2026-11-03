@@ -1,4 +1,5 @@
 import { App, PluginSettingTab, Setting, debounce, setIcon } from "obsidian";
+import type { Debouncer } from "obsidian";
 import type CookbookPlugin from "../main";
 import { PathSuggest } from "../utils/suggesters/PathSuggest";
 import type { IngredientGroup, KeywordGroup, StoreLayout } from "../types";
@@ -17,12 +18,18 @@ const SAVE_DEBOUNCE_MS = 400;
 
 export class CookbookSettingTab extends PluginSettingTab {
 	plugin: CookbookPlugin;
-	private readonly saveDebounced: () => void;
+	private readonly saveDebounced: Debouncer<[], void>;
 
 	constructor(app: App, plugin: CookbookPlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
 		this.saveDebounced = debounce(() => void this.plugin.saveSettings(), SAVE_DEBOUNCE_MS, false);
+	}
+
+	/** Write any pending edit now, so closing settings can't drop the last keystrokes. */
+	hide(): void {
+		this.saveDebounced.run();
+		super.hide();
 	}
 
 	/** Edits any named keyword list — shopping categories and ingredient groups alike. */

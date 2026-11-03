@@ -66,7 +66,8 @@
 	// svelte-ignore state_referenced_locally
 	const overlap = cooksWellWith.slice(0, COOKS_WELL_WITH_LIMIT);
 	let multiplier = $state(initialMultiplier);
-	let renderComp: Component | null = null;
+	// Created up front so onDestroy always releases it, even mid-render
+	const renderComp = new Component();
 
 	// recipe is a stable prop — capture once, it never changes for this modal
 	// svelte-ignore state_referenced_locally
@@ -78,6 +79,7 @@
 	const tags = (recipe.__tags ?? []).map((t: string) => t.replace(/^#/, ""));
 
 	onMount(async () => {
+		renderComp.load();
 		const file = app.vault.getFileByPath(recipe.path);
 		if (!file) {
 			error = "Could not find recipe file.";
@@ -89,9 +91,6 @@
 			const raw = await app.vault.read(file);
 			// Strip YAML frontmatter block before rendering
 			const body = raw.replace(/^---[\s\S]*?---\n?/, "").trimStart();
-
-			renderComp = new Component();
-			renderComp.load();
 
 			await MarkdownRenderer.render(
 				app,
@@ -108,7 +107,7 @@
 	});
 
 	onDestroy(() => {
-		renderComp?.unload();
+		renderComp.unload();
 	});
 
 	function handleToggleCookSoon() {
