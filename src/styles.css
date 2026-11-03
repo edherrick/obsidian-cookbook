@@ -72,6 +72,8 @@
 
 .cookbook-list-row .setting-item-control {
 	flex: 1 1 auto;
+	/* Let the keyword preview truncate instead of widening the row */
+	min-width: 0;
 	justify-content: flex-start;
 	flex-wrap: wrap;
 	gap: 6px;
@@ -82,14 +84,133 @@
 	flex-shrink: 0;
 }
 
-.cookbook-cat-keywords {
-	flex: 1;
-	min-width: 160px;
+.cookbook-row-toggle {
+	flex-shrink: 0;
 }
 
-.cookbook-cat-excludes {
-	flex: 1;
-	min-width: 140px;
+/* Collapsed: count plus a one-line preview of the keywords */
+.cookbook-row-summary {
+	/* Takes whatever is left beside the name, so it never wraps to a second line */
+	flex: 1 1 0;
+	min-width: 0;
+	display: flex;
+	align-items: baseline;
+	gap: 0.5em;
+	cursor: pointer;
+	font-size: var(--font-ui-small);
+	color: var(--text-muted);
+}
+
+.cookbook-row-count {
+	flex-shrink: 0;
+	white-space: nowrap;
+	color: var(--text-normal);
+}
+
+.cookbook-row-preview {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* Expanded: the full keyword list on its own line under the name.
+   Ordered last so the list's own delete and drag buttons stay on the name line. */
+.cookbook-row-detail {
+	display: none;
+	order: 1;
+	flex: 1 1 100%;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.cookbook-list-row.is-expanded .cookbook-row-summary {
+	display: none;
+}
+
+.cookbook-list-row.is-expanded .cookbook-row-detail {
+	display: flex;
+}
+
+.cookbook-row-field {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	text-align: start;
+}
+
+.cookbook-row-field-header {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 0.5em;
+}
+
+.cookbook-row-field-label {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+}
+
+.cookbook-field-mode {
+	font-size: var(--font-ui-smaller);
+	padding: 0 6px;
+	height: auto;
+	background: none;
+	box-shadow: none;
+	color: var(--text-accent);
+	cursor: pointer;
+}
+
+/* Pills use Obsidian's own multi-select classes; these only fit them to a settings row */
+.cookbook-row-field .multi-select-container {
+	width: 100%;
+	padding: var(--size-2-2) var(--size-4-2);
+	align-items: center;
+}
+
+.cookbook-row-field .multi-select-input {
+	flex: 1 0 6em;
+	max-width: none;
+	outline: none;
+}
+
+/* Obsidian only styles invalid pills inside the Properties panel */
+.cookbook-row-field .multi-select-pill.is-invalid {
+	--pill-color: var(--text-error);
+	--pill-color-remove: var(--text-error);
+	text-decoration-line: line-through;
+}
+
+.cookbook-row-field .multi-select-input.is-invalid {
+	color: var(--text-error);
+}
+
+/* A setting whose list is edited under its name, at full width */
+.cookbook-pill-setting {
+	flex-wrap: wrap;
+}
+
+.cookbook-pill-setting > .cookbook-row-field {
+	flex: 1 1 100%;
+	margin-top: var(--size-4-2);
+}
+
+/* "Edit as text" swaps the pills for a plain text box */
+.cookbook-row-textarea {
+	display: none;
+	width: 100%;
+	min-height: 2.2em;
+	resize: none;
+	overflow: hidden;
+	line-height: 1.5;
+}
+
+.cookbook-row-field.is-text .multi-select-container {
+	display: none;
+}
+
+.cookbook-row-field.is-text .cookbook-row-textarea {
+	display: block;
 }
 
 .cookbook-store-summary {

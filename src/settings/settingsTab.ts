@@ -6,6 +6,9 @@ import { cloneDefaultSettings } from "./index";
 import { commaList } from "./host";
 import type { SettingsHost } from "./host";
 import { keywordList } from "./keywordList";
+import { keywordField } from "./keywordField";
+import type { KeywordFieldOptions } from "./keywordField";
+import { renameCategory } from "./renameCategory";
 import { storeLayoutItems } from "./storeLayouts";
 import { PathPickerModal } from "./pathPickerModal";
 import { renderIngredientNamesPanel } from "./ingredientNamesPanel";
@@ -96,18 +99,6 @@ const CODECS: Partial<Record<keyof CookbookSettings, Codec>> = {
 		get: (s) => s.activeStoreLayout ?? s.storeLayouts[0]?.name ?? "",
 		set: (s, v) => {
 			s.activeStoreLayout = text(v);
-		},
-	},
-	stapleIngredients: {
-		get: (s) => s.stapleIngredients.join(", "),
-		set: (s, v) => {
-			s.stapleIngredients = commaList(text(v));
-		},
-	},
-	overlapIgnoreCategories: {
-		get: (s) => s.overlapIgnoreCategories.join(", "),
-		set: (s, v) => {
-			s.overlapIgnoreCategories = commaList(text(v));
 		},
 	},
 };
@@ -268,6 +259,10 @@ export class CookbookSettingTab extends PluginSettingTab implements SettingsHost
 								emptyState: "No categories. Every item will be uncategorized.",
 								namePlaceholder: "Name (e.g. Produce)",
 								reorderable: true,
+								onRename: (from, to) => {
+									renameCategory(settings, from, to);
+									this.saveSoon();
+								},
 							}),
 						],
 					},
@@ -339,6 +334,8 @@ export class CookbookSettingTab extends PluginSettingTab implements SettingsHost
 								emptyState: "No techniques. Only tagged lines will count.",
 								namePlaceholder: "Name (e.g. dice)",
 								keywordsPlaceholder: "Words that mean it, e.g. diced, cubed",
+								keywordsLabel: "Words that mean it",
+								countNoun: ["word", "words"],
 								reorderable: true,
 							}),
 						],
@@ -365,6 +362,8 @@ export class CookbookSettingTab extends PluginSettingTab implements SettingsHost
 								emptyState: "No aliases.",
 								namePlaceholder: "Name (e.g. scallion)",
 								keywordsPlaceholder: "Other names, e.g. green onion, spring onion",
+								keywordsLabel: "Other names",
+								countNoun: ["other name", "other names"],
 							}),
 							{
 								type: "group",
@@ -382,17 +381,53 @@ export class CookbookSettingTab extends PluginSettingTab implements SettingsHost
 					},
 					{
 						name: "Staple ingredients",
-						desc: "Ingredients nearly every recipe uses. They are ignored when finding recipes that cook well together. Comma-separated.",
-						control: { type: "textarea", key: "stapleIngredients" },
+						desc: "Ingredients nearly every recipe uses. They are ignored when finding recipes that cook well together.",
+						render: (setting: Setting) =>
+							this.renderPillSetting(setting, {
+								placeholder: "Type or paste ingredients, comma-separated",
+								get: () => settings.stapleIngredients,
+								set: (value) => {
+									settings.stapleIngredients = value;
+									this.saveSoon();
+								},
+							}),
 					},
 					{
 						name: "Ignored aisles",
-						desc: "Shopping categories whose ingredients don't count as overlap. Comma-separated.",
-						control: { type: "text", key: "overlapIgnoreCategories" },
+						desc: "Shopping categories whose ingredients don't count as overlap.",
+						render: (setting: Setting) =>
+							this.renderPillSetting(setting, {
+								placeholder: "Choose a category",
+								get: () => settings.overlapIgnoreCategories,
+								set: (value) => {
+									settings.overlapIgnoreCategories = value;
+									this.saveSoon();
+								},
+								choices: {
+									app: this.app,
+									items: () => settings.shoppingCategories.map((c) => c.name),
+									noun: "category",
+								},
+							}),
 					},
 				],
 			},
 		];
+	}
+
+	/** A setting whose value is a list, edited as pills under its name. */
+	private renderPillSetting(setting: Setting, opts: KeywordFieldOptions): () => void {
+		setting.settingEl.addClass("cookbook-pill-setting");
+		const field = keywordField(setting.settingEl, opts);
+		// "Edit as text" sits beside the setting's name, where its controls go
+		const header = setting.settingEl.querySelector(".cookbook-row-field-header");
+		const mode = header?.querySelector(".cookbook-field-mode");
+		if (mode) setting.controlEl.appendChild(mode);
+		// The setting's name now labels the field for screen readers
+		const labelId = header?.querySelector(".cookbook-row-field-label")?.id;
+		header?.remove();
+		if (labelId) setting.nameEl.id = labelId;
+		return () => field.destroy();
 	}
 
 	private renderNamesPanel(setting: Setting): void {

@@ -27,3 +27,43 @@ export function commaList(value: string): string[] {
 		.map((s) => s.trim())
 		.filter((s) => s.length > 0);
 }
+
+/** Split pasted or typed text on commas and new lines, dropping empty pieces. */
+export function splitList(raw: string): string[] {
+	return raw
+		.split(/[,\n]/)
+		.map((s) => s.trim())
+		.filter((s) => s.length > 0);
+}
+
+/**
+ * Add the keywords in `raw` (separated by commas or new lines) to `existing`.
+ * Keywords already present, in any letter case, are skipped, as are repeats
+ * within `raw` itself, so pasting a list twice changes nothing.
+ */
+export function mergeKeywords(existing: readonly string[], raw: string): string[] {
+	const seen = new Set(existing.map((k) => k.toLowerCase()));
+	const result = [...existing];
+	for (const keyword of splitList(raw)) {
+		if (seen.has(keyword.toLowerCase())) continue;
+		seen.add(keyword.toLowerCase());
+		result.push(keyword);
+	}
+	return result;
+}
+
+/**
+ * Sort typed values into the allowed choices they name (ignoring letter case,
+ * returned in the choice's own spelling) and the ones that match nothing.
+ */
+export function matchChoices(values: readonly string[], choices: readonly string[]): { matched: string[]; unmatched: string[] } {
+	const byLower = new Map(choices.map((c) => [c.toLowerCase(), c]));
+	const matched: string[] = [];
+	const unmatched: string[] = [];
+	for (const value of values) {
+		const choice = byLower.get(value.toLowerCase());
+		if (choice === undefined) unmatched.push(value);
+		else matched.push(choice);
+	}
+	return { matched, unmatched };
+}
