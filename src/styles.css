@@ -1,4 +1,4 @@
-.btn {
+.cookbook-btn {
 	--btn-font-size: 1.05rem;
 	--btn-icon-size: 20px;
 	--btn-padding-y: 0.75rem;
@@ -11,16 +11,16 @@
 	gap: 0.6rem;
 }
 
-.btn-icon svg {
+.cookbook-btn-icon svg {
 	width: var(--btn-icon-size);
 	height: var(--btn-icon-size);
 }
 
-.btn-label {
+.cookbook-btn-label {
 	white-space: nowrap;
 }
 
-.btn-row {
+.cookbook-btn-row {
 	display: flex;
 	justify-content: center;
 	gap: 0.7rem;
@@ -29,29 +29,32 @@
 }
 
 @media (max-width: 480px) {
-	.btn-row {
+	.cookbook-btn-row {
 		flex-direction: column;
 	}
 
-	.btn-row .btn {
+	.cookbook-btn-row .cookbook-btn {
 		width: 100%;
 		justify-content: center;
 	}
 }
 
-.modal {
-	width: min(70vw, 100%) !important;
-	max-width: min(80vw, 100%) !important;
+/* Cookbook's own windows only. Obsidian sizes every modal from these
+   variables, so setting them here needs no extra specificity and leaves other
+   plugins' modals alone. */
+.cookbook-modal {
+	--dialog-width: min(70vw, 100%);
+	--dialog-max-width: min(80vw, 100%);
 }
 
 @media (max-width: 500px) {
-	.modal {
-		width: 95vw !important;
-		max-width: 95vw !important;
+	.cookbook-modal {
+		--dialog-width: 95vw;
+		--dialog-max-width: 95vw;
 	}
 }
 
-.modal-content {
+.cookbook-modal .modal-content {
 	width: 100%;                       /* fill the modal container */
 	height: auto;
 	max-height: 80vh;
@@ -178,7 +181,7 @@
 .cookbook-row-field .multi-select-pill.is-invalid {
 	--pill-color: var(--text-error);
 	--pill-color-remove: var(--text-error);
-	text-decoration-line: line-through;
+	text-decoration: line-through;
 }
 
 .cookbook-row-field .multi-select-input.is-invalid {

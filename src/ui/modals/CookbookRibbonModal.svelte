@@ -173,18 +173,18 @@
 		</div>
 	{/if}
 
-	<div class="btn-row">
-		<button class="btn" onclick={openRecipeModal}>
-			<span use:obsidianIcon={"book-open"} class="btn-icon"></span>
-			<span class="btn-label">Open Cookbook</span>
+	<div class="cookbook-btn-row">
+		<button class="cookbook-btn" onclick={openRecipeModal}>
+			<span use:obsidianIcon={"book-open"} class="cookbook-btn-icon"></span>
+			<span class="cookbook-btn-label">Open Cookbook</span>
 		</button>
 
-		<button class="btn" onclick={handleGenerate} disabled={generating}>
+		<button class="cookbook-btn" onclick={handleGenerate} disabled={generating}>
 			<span
 				use:obsidianIcon={"shopping-cart"}
-				class="btn-icon"
+				class="cookbook-btn-icon"
 			></span>
-			<span class="btn-label"
+			<span class="cookbook-btn-label"
 				>{generating
 					? "Generating…"
 					: "Generate Shopping List"}</span
@@ -192,9 +192,9 @@
 		</button>
 
 		{#if $cookTogetherRecipes && $cookTogetherRecipes.length > 0}
-			<button class="btn" onclick={handleStartSession} disabled={startingSession}>
-				<span use:obsidianIcon={"cooking-pot"} class="btn-icon"></span>
-				<span class="btn-label">{startingSession ? "Writing…" : "Start Cooking Session"}</span>
+			<button class="cookbook-btn" onclick={handleStartSession} disabled={startingSession}>
+				<span use:obsidianIcon={"cooking-pot"} class="cookbook-btn-icon"></span>
+				<span class="cookbook-btn-label">{startingSession ? "Writing…" : "Start Cooking Session"}</span>
 			</button>
 		{/if}
 	</div>
@@ -279,13 +279,13 @@
 		margin: 0;
 	}
 
-	.btn-row {
+	.cookbook-btn-row {
 		display: flex;
 		flex-wrap: wrap;
 		gap: 0.75rem;
 	}
 
-	.btn {
+	.cookbook-btn {
 		display: flex;
 		align-items: center;
 		gap: 6px;

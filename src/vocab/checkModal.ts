@@ -24,6 +24,7 @@ export class VocabularyCheckModal extends Modal {
 	}
 
 	onOpen(): void {
+		this.modalEl.addClass("cookbook-modal");
 		this.titleEl.setText("Recipe technique tags");
 		void this.render();
 	}

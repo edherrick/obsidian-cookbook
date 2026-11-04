@@ -152,14 +152,14 @@
 		{/each}
 	</ol>
 
-	<div class="btn-row">
-		<button class="btn" onclick={reset}>
-			<span use:obsidianIcon={"rotate-ccw"} class="btn-icon"></span>
-			<span class="btn-label">Reset Order</span>
+	<div class="cookbook-btn-row">
+		<button class="cookbook-btn" onclick={reset}>
+			<span use:obsidianIcon={"rotate-ccw"} class="cookbook-btn-icon"></span>
+			<span class="cookbook-btn-label">Reset Order</span>
 		</button>
-		<button class="btn" onclick={handleSave} disabled={saving}>
-			<span use:obsidianIcon={"save"} class="btn-icon"></span>
-			<span class="btn-label">{saving ? "Saving…" : "Save Cook Order"}</span>
+		<button class="cookbook-btn" onclick={handleSave} disabled={saving}>
+			<span use:obsidianIcon={"save"} class="cookbook-btn-icon"></span>
+			<span class="cookbook-btn-label">{saving ? "Saving…" : "Save Cook Order"}</span>
 		</button>
 	</div>
 </div>
@@ -290,13 +290,13 @@
 		opacity: 0.4;
 	}
 
-	.btn-row {
+	.cookbook-btn-row {
 		display: flex;
 		flex-wrap: wrap;
 		gap: 0.75rem;
 	}
 
-	.btn {
+	.cookbook-btn {
 		display: flex;
 		align-items: center;
 		gap: 6px;

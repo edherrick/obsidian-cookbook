@@ -15,6 +15,8 @@ export class SvelteModalWrapper<Props extends Record<string, unknown>> extends M
 	}
 
 	onOpen(): void {
+		// Sizes this window (see styles.css) without touching other plugins' modals
+		this.modalEl.addClass("cookbook-modal");
 		// Callers pass every prop except close; adding it here completes Props
 		const props = { ...this.props, close: () => this.close() } as unknown as Props;
 		this.destroy = mountSvelte(this.component, this.contentEl, props);
