@@ -4,9 +4,20 @@
 export class TFile {
 	path: string;
 	basename: string;
+	extension: string;
 	constructor(path: string) {
 		this.path = path;
 		this.basename = path.split("/").pop()?.replace(/\.[^.]+$/, "") ?? path;
+		this.extension = /\.([^./]+)$/.exec(path)?.[1] ?? "";
+	}
+}
+
+export class TFolder {
+	path: string;
+	children: (TFile | TFolder)[];
+	constructor(path: string, children: (TFile | TFolder)[] = []) {
+		this.path = path;
+		this.children = children;
 	}
 }
 

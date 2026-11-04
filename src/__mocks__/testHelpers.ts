@@ -1,6 +1,6 @@
 import type { App } from "obsidian";
 import type { ShoppingItem } from "../types";
-import { TFile } from "./obsidian";
+import { TFile, TFolder } from "./obsidian";
 
 export interface FileFixture {
 	path: string;
@@ -16,6 +16,11 @@ export function makeApp(files: FileFixture[]): App {
 			getFiles: () => tfiles,
 			getMarkdownFiles: () => tfiles.filter((f) => f.path.endsWith(".md")),
 			getFileByPath: (path: string) => tfiles.find((f) => f.path === path) ?? null,
+			// Every file under the folder, as its direct children; the scan recurses either way
+			getFolderByPath: (path: string) => {
+				const inside = tfiles.filter((f) => f.path.startsWith(`${path}/`));
+				return inside.length > 0 ? new TFolder(path, inside) : null;
+			},
 			read: async (file: { path: string }) =>
 				files.find((f) => f.path === file.path)?.content ?? "",
 		},

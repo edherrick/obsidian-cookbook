@@ -141,6 +141,20 @@ describe("getRecipes", () => {
 		expect(recipes.map((r) => r.path)).toEqual(["Recipes/Soup.md"]);
 	});
 
+	it("scans nested folders and skips non-markdown files under the recipes folder", async () => {
+		const app = makeApp([
+			{ path: "Recipes/Mains/Soup.md", frontmatter: { title: "Soup", tags: ["recipe"] } },
+			{ path: "Recipes/cover.png" },
+		]);
+		const recipes = await getRecipes(app, "cook-soon", [], "Recipes");
+		expect(recipes.map((r) => r.path)).toEqual(["Recipes/Mains/Soup.md"]);
+	});
+
+	it("finds nothing when the recipes folder doesn't exist", async () => {
+		const app = makeApp([{ path: "Recipes/Soup.md", frontmatter: { title: "Soup", tags: ["recipe"] } }]);
+		expect(await getRecipes(app, "cook-soon", [], "Missing")).toEqual([]);
+	});
+
 	it("treats recipesFolder '.' as no folder restriction", async () => {
 		const app = makeApp([
 			{ path: "Recipes/Soup.md", frontmatter: { title: "Soup", tags: ["recipe"] } },

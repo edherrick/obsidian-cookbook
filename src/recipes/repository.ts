@@ -1,5 +1,5 @@
-import { normalizePath } from "obsidian";
-import type { App, TFile } from "obsidian";
+import { normalizePath, TFile, TFolder } from "obsidian";
+import type { App } from "obsidian";
 import type { Writable } from "svelte/store";
 
 export interface Recipe {
@@ -31,6 +31,26 @@ export interface RecipeScanOptions {
 	techniqueTagPrefix?: string;
 }
 
+/**
+ * Markdown files to scan for recipes: only the recipes folder when one is
+ * set, so the rest of the vault isn't listed at all; otherwise the whole
+ * vault. Only markdown files can carry recipe frontmatter.
+ */
+function markdownFiles(app: App, folder: string | null): TFile[] {
+	if (!folder) return app.vault.getMarkdownFiles();
+	const root = app.vault.getFolderByPath(folder);
+	if (!root) return [];
+	const files: TFile[] = [];
+	const walk = (dir: TFolder) => {
+		for (const child of dir.children) {
+			if (child instanceof TFolder) walk(child);
+			else if (child instanceof TFile && child.extension === "md") files.push(child);
+		}
+	};
+	walk(root);
+	return files;
+}
+
 export async function getRecipes(
 	app: App,
 	cookSoonProp = "cook-soon",
@@ -43,11 +63,10 @@ export async function getRecipes(
 	const techniquePrefix = options.techniqueTagPrefix
 		? `#${options.techniqueTagPrefix.replace(/^#/, "").replace(/\/+$/, "")}/`.toLowerCase()
 		: null;
-	// Only markdown files can carry recipe frontmatter — skip images, PDFs, etc.
-	const files: TFile[] = app.vault.getMarkdownFiles();
-	const recipes: Recipe[] = [];
 	const normalizedFolder =
 		recipesFolder && recipesFolder !== "." ? normalizePath(recipesFolder.trim()) : null;
+	const files = markdownFiles(app, normalizedFolder);
+	const recipes: Recipe[] = [];
 	const expectedTag = recipesTag.startsWith("#") ? recipesTag : `#${recipesTag}`;
 
 	for (const file of files) {

@@ -257,6 +257,12 @@ Every setting is described where you change it, under **Settings → Cookbook**.
 | **Cooking sessions** | The frontmatter key for the **Cook session** toggle, the session folder, and prep techniques with their tag prefix. |
 | **Overlap** | Categories left out of [Cooks well with](#cooks-well-with). |
 
+## What Cookbook reads and writes
+
+- **Reads** your Markdown notes to find recipes (notes tagged `#recipe`). With a recipes folder set, only that folder is scanned.
+- **Writes** only: the shopping list and cook session flags in a recipe's frontmatter, cook session notes in the session folder, and the shopping list note if you choose to save it to one.
+- **Network:** none of its own. Cover images given as web addresses load from the web, as any image in a note does.
+
 ## Installation
 
 ### Community plugins (recommended)
