@@ -22,6 +22,9 @@
 	import type { IngredientGroup } from "../../types";
 	import type { FilterValue } from "../../filters/model";
 	import { buildFilterOptions, recipeMatchesFilters } from "../../filters/model";
+	import { matchesQuickFilter, mealTypes } from "../../recipes/browse";
+	import type { QuickFilter } from "../../recipes/browse";
+	import { obsidianIcon } from "../../utils/obsidianIcon";
 
 	const {
 		stores,
@@ -108,8 +111,44 @@
 
 	let filterOptions = $derived(buildFilterOptions($recipes, EXCLUDED_KEYS));
 
+	// ─── Search and quick filters ───────────────────────────────────────────────
+	let query = $state("");
+	let onlyCookSoon = $state(false);
+	let onlyUntried = $state(false);
+	let pickedMealTypes: string[] = $state([]);
+	/** The full filter builder; opens by itself while any of its filters are set. */
+	let showFilters = $state(false);
+
+	let quick: QuickFilter = $derived({
+		query,
+		cookSoon: onlyCookSoon,
+		untried: onlyUntried,
+		mealTypes: pickedMealTypes,
+	});
+	let quickActive = $derived(!!query.trim() || onlyCookSoon || onlyUntried || pickedMealTypes.length > 0);
+	let anyFilter = $derived(quickActive || activeFilters.size > 0);
+
+	let cookSoonCount = $derived($recipes.filter((r) => r.cook_soon).length);
+	let tracksTried = $derived($recipes.some((r) => "tried" in r));
+	let mealTypeOptions = $derived(mealTypes($recipes).slice(0, 6));
+
+	function toggleMealType(type: string) {
+		pickedMealTypes = pickedMealTypes.includes(type)
+			? pickedMealTypes.filter((t) => t !== type)
+			: [...pickedMealTypes, type];
+	}
+
+	function clearFilters() {
+		query = "";
+		onlyCookSoon = false;
+		onlyUntried = false;
+		pickedMealTypes = [];
+		activeFilters = new Map();
+	}
+
 	let matchingRecipes = $derived(
 		$recipes.filter((r) =>
+			matchesQuickFilter(r, quick) &&
 			recipeMatchesFilters(r, activeFilters, {
 				ingredientsByPath: recipeIngredientMap,
 				ingredientGroups,
@@ -169,23 +208,68 @@
 </script>
 
 <div class="recipes-modal">
-	<FilterBar
-		filters={activeFilters}
-		{filterOptions}
-		{ingredientGroups}
-		{allIngredientNames}
-		{ingredientsReady}
-		onChange={(next) => (activeFilters = next)}
-	/>
+	<div class="browse-bar">
+		<div class="search-row">
+			<div class="search-box">
+				<span class="search-icon" use:obsidianIcon={"search"} aria-hidden="true"></span>
+				<input
+					type="search"
+					placeholder="Search recipes or cuisines"
+					aria-label="Search recipes"
+					bind:value={query}
+				/>
+			</div>
+			<button
+				class="filters-btn"
+				class:is-on={activeFilters.size > 0}
+				aria-expanded={showFilters || activeFilters.size > 0}
+				onclick={() => (showFilters = !showFilters)}
+			>
+				<span use:obsidianIcon={"sliders-horizontal"} aria-hidden="true"></span>
+				Filters{#if activeFilters.size > 0}&nbsp;· {activeFilters.size}{/if}
+			</button>
+		</div>
+		<div class="quick-chips" role="group" aria-label="Quick filters">
+			<button class="quick-chip" aria-pressed={onlyCookSoon} onclick={() => (onlyCookSoon = !onlyCookSoon)}>
+				Cook soon{#if cookSoonCount > 0}&nbsp;<span class="chip-count">{cookSoonCount}</span>{/if}
+			</button>
+			{#if tracksTried}
+				<button class="quick-chip" aria-pressed={onlyUntried} onclick={() => (onlyUntried = !onlyUntried)}>
+					Not tried yet
+				</button>
+			{/if}
+			{#each mealTypeOptions as type (type)}
+				<button
+					class="quick-chip"
+					aria-pressed={pickedMealTypes.includes(type)}
+					onclick={() => toggleMealType(type)}
+				>{type}</button>
+			{/each}
+		</div>
+	</div>
 
-	<div class="recipe-toolbar">
-		<div class="recipe-count">
+	{#if showFilters || activeFilters.size > 0}
+		<FilterBar
+			filters={activeFilters}
+			{filterOptions}
+			{ingredientGroups}
+			{allIngredientNames}
+			{ingredientsReady}
+			onChange={(next) => (activeFilters = next)}
+		/>
+	{/if}
+
+	<div class="cookbook-toolbar">
+		<div class="cookbook-count">
 			{filteredRecipes.length} recipe{filteredRecipes.length !== 1 ? "s" : ""}
-			{#if activeFilters.size > 0}(filtered from {$recipes.length}){/if}
+			{#if anyFilter}
+				of {$recipes.length}
+				<button class="clear-btn" onclick={clearFilters}>Clear</button>
+			{/if}
 		</div>
 		<label class="sort-control">
 			Sort
-			<select bind:value={sortMode} disabled={!ingredientsReady}>
+			<select class="dropdown" bind:value={sortMode} disabled={!ingredientsReady}>
 				<option value="name">Default</option>
 				<option value="overlap" disabled={cookTogetherPaths.length === 0}>
 					Overlap with cook-together set
@@ -194,9 +278,9 @@
 		</label>
 	</div>
 
-	<div class="recipe-grid">
-		{#if filteredRecipes.length === 0 && activeFilters.size > 0}
-			<p>No recipes match the current filters.</p>
+	<div class="cookbook-grid">
+		{#if filteredRecipes.length === 0 && anyFilter}
+			<p class="empty">No recipes match. <button class="clear-btn" onclick={clearFilters}>Clear filters</button></p>
 		{:else if $recipes.length === 0}
 			<p>
 				No recipes found. Add the <code>#recipe</code> tag to your recipe notes.
@@ -226,7 +310,98 @@
 		gap: 0.75rem;
 	}
 
-	.recipe-toolbar {
+	.browse-bar {
+		display: flex;
+		flex-direction: column;
+		gap: var(--size-4-2);
+	}
+
+	.search-row {
+		display: flex;
+		gap: var(--size-4-2);
+	}
+
+	.search-box {
+		flex: 1;
+		position: relative;
+		display: flex;
+		align-items: center;
+	}
+
+	.search-icon {
+		position: absolute;
+		left: var(--size-4-2);
+		display: inline-flex;
+		color: var(--text-faint);
+		--icon-size: 16px;
+		pointer-events: none;
+	}
+
+	.search-box input {
+		width: 100%;
+		padding-left: calc(var(--size-4-2) * 2 + 16px);
+	}
+
+	.filters-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--size-2-3);
+		white-space: nowrap;
+	}
+
+	.filters-btn.is-on {
+		color: var(--text-accent);
+	}
+
+	.quick-chips {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--size-4-1);
+	}
+
+	.quick-chip {
+		height: auto;
+		padding: var(--size-2-2) var(--size-4-3);
+		border-radius: var(--radius-l);
+		font-size: var(--font-ui-small);
+		background: var(--background-secondary);
+		box-shadow: none;
+		border: 1px solid var(--background-modifier-border);
+		color: var(--text-muted);
+	}
+
+	.quick-chip:hover {
+		color: var(--text-normal);
+	}
+
+	.quick-chip[aria-pressed="true"] {
+		background: color-mix(in srgb, var(--interactive-accent) 16%, var(--background-secondary));
+		border-color: var(--interactive-accent);
+		color: var(--text-normal);
+	}
+
+	.chip-count {
+		color: var(--text-accent);
+		font-weight: var(--font-semibold);
+	}
+
+	.clear-btn {
+		all: unset;
+		margin-left: var(--size-2-3);
+		color: var(--text-accent);
+		cursor: pointer;
+	}
+
+	.clear-btn:hover {
+		text-decoration: underline;
+	}
+
+	.empty {
+		grid-column: 1 / -1;
+		color: var(--text-muted);
+	}
+
+	.cookbook-toolbar {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
@@ -234,7 +409,7 @@
 		gap: 0.5rem;
 	}
 
-	.recipe-count {
+	.cookbook-count {
 		font-size: 0.85em;
 		color: var(--text-muted);
 	}
@@ -247,9 +422,9 @@
 		color: var(--text-muted);
 	}
 
-	.recipe-grid {
+	.cookbook-grid {
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr));
+		grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr));
 		gap: 1rem;
 	}
 </style>

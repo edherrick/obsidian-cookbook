@@ -9,6 +9,7 @@
 	} from "../../types";
 	import { IngredientCatalog } from "../../ingredients/catalog";
 	import { groupForStore } from "../../shopping/route";
+	import { DOT_COLORS, recipeIndexes, splitDone } from "../../shopping/display";
 	import { formatQty } from "../../ingredients/units";
 
 	const {
@@ -41,7 +42,7 @@
 	let activeStore = $derived($settings.activeStoreLayout ?? layouts[0]?.name ?? "");
 	/** Files a typed-in item under its ingredient's category. */
 	let catalog = $derived(
-		new IngredientCatalog($settings.ingredients, $settings.shoppingCategories.map((c) => c.name)),
+		new IngredientCatalog($settings.ingredients, $settings.shoppingCategories.map((c: { name: string }) => c.name)),
 	);
 
 	/**
@@ -81,6 +82,31 @@
 			ingredientOf: (item) => catalog.ingredientFor(item.text)?.name,
 		}),
 	);
+	// ─── Display ──────────────────────────────────────────────────────────────
+	// svelte-ignore state_referenced_locally — stores is a stable reference
+	const recipesStore = stores.recipes;
+	/** Prep notes are for cooking, not shopping, so they're hidden unless asked for. */
+	let showPrep = $state(false);
+	/** Groups whose checked items are shown; otherwise they fold into "N done". */
+	let openDone: string[] = $state([]);
+
+	/** Recipes on this list, in the order their items first appear; each gets a dot colour. */
+	let listTitles = $derived.by(() => {
+		const titles = $recipesStore.map((r: { title?: unknown }) => String(r.title ?? "")).filter(Boolean);
+		const seen: string[] = [];
+		for (const item of allItems) {
+			for (const i of recipeIndexes(item.recipeTitle, titles)) {
+				if (!seen.includes(titles[i]!)) seen.push(titles[i]!);
+			}
+		}
+		return seen;
+	});
+	const dotColor = (i: number) => `var(--color-${DOT_COLORS[i % DOT_COLORS.length]})`;
+
+	function toggleDone(key: string) {
+		openDone = openDone.includes(key) ? openDone.filter((k) => k !== key) : [...openDone, key];
+	}
+
 	/** Only category groups can be reordered; an aisle's number fixes its place. */
 	let categoryGroups = $derived(groups.filter((g) => g.category !== undefined));
 
@@ -198,6 +224,7 @@
 	// ─── Stats ────────────────────────────────────────────────────────────────
 	let totalItems = $derived(allItems.length);
 	let checkedCount = $derived(allItems.filter((i) => i.checked).length);
+	let progress = $derived(totalItems === 0 ? 0 : Math.round((checkedCount / totalItems) * 100));
 
 	let resetPending = $state(false);
 	let resetTimer: ReturnType<typeof setTimeout> | null = null;
@@ -230,36 +257,93 @@
 	}
 </script>
 
+{#snippet itemRow(item: ShoppingItem)}
+	{@const dots = recipeIndexes(item.recipeTitle, listTitles)}
+	<li class:checked={item.checked}>
+		<label class="item-label">
+			<input type="checkbox" checked={item.checked} onchange={() => toggleItem(item)} />
+			<span class="item-content">
+				<span class="item-line">
+					{#if item.quantity !== null || item.unit}
+						<span class="item-qty">{#if item.quantity !== null}{formatQty(item.quantity)}{/if}{#if item.unit}&nbsp;{item.unit}{/if}</span>
+					{/if}
+					<span class="item-text">{item.text}</span>
+				</span>
+				{#if showPrep && item.prep}
+					<span class="item-prep">{item.prep}</span>
+				{/if}
+			</span>
+		</label>
+		{#if dots.length > 0}
+			<span class="item-dots" title={item.recipeTitle} aria-label="From {item.recipeTitle}">
+				{#each dots as d (d)}
+					<span class="dot" style:--dot={dotColor(d)}></span>
+				{/each}
+			</span>
+		{/if}
+		{#if item.source === "custom"}
+			<button class="remove-btn" onclick={() => removeCustomItem(item.id)} aria-label="Remove {item.text}"
+				><span use:obsidianIcon={"x"} aria-hidden="true"></span></button>
+		{/if}
+	</li>
+{/snippet}
+
 <div class="shopping-list-view">
 	<div class="header">
-		<h3>Shopping List</h3>
-		{#if layouts.length > 1}
-			<label class="sr-only" for="shopping-store-select">Store layout</label>
-			<select
-				id="shopping-store-select"
-				class="store-select"
-				value={activeStore}
-				onchange={(e) => selectStore((e.currentTarget as HTMLSelectElement).value)}
-				title="Order the list by this shop's aisles"
-			>
-				{#each layouts as l (l.name)}
-					<option value={l.name}>{l.name}</option>
-				{/each}
-			</select>
-		{/if}
-		{#if generatedAt}
-			<span class="generated-at"
-				>{new Date(generatedAt).toLocaleDateString()}</span
-			>
-		{/if}
+		<div class="title-row">
+			<h3>Shopping list</h3>
+			{#if layouts.length > 1}
+				<label class="sr-only" for="shopping-store-select">Store layout</label>
+				<select
+					id="shopping-store-select"
+					class="store-select dropdown"
+					value={activeStore}
+					onchange={(e) => selectStore((e.currentTarget as HTMLSelectElement).value)}
+					title="Order the list by this shop's aisles"
+				>
+					{#each layouts as l (l.name)}
+						<option value={l.name}>{l.name}</option>
+					{/each}
+				</select>
+			{/if}
+			{#if totalItems > 0}
+				<button
+					class="clickable-icon"
+					class:is-active={showPrep}
+					aria-pressed={showPrep}
+					aria-label={showPrep ? "Hide prep notes" : "Show prep notes"}
+					title={showPrep ? "Hide prep notes" : "Show prep notes"}
+					onclick={() => (showPrep = !showPrep)}
+				><span use:obsidianIcon={"list"} aria-hidden="true"></span></button>
+				<button
+					class="clickable-icon reset-btn"
+					class:reset-confirm={resetPending}
+					onclick={handleResetClick}
+					aria-label={resetPending ? "Click again to clear the list" : "Clear shopping list"}
+					title={resetPending ? "Click again to clear the list" : "Clear shopping list"}
+				>{#if resetPending}Sure?{:else}<span use:obsidianIcon={"rotate-ccw"} aria-hidden="true"></span>{/if}</button>
+			{/if}
+		</div>
 		{#if totalItems > 0}
-			<span class="progress">{checkedCount}/{totalItems}</span>
-			<button
-				class="reset-btn"
-				class:reset-confirm={resetPending}
-				onclick={handleResetClick}
-				title={resetPending ? "Click again to confirm" : "Clear shopping list"}
-			>{#if !resetPending}<span use:obsidianIcon={"rotate-ccw"} aria-hidden="true"></span>{/if}{resetPending ? "Sure?" : "Reset"}</button>
+			<div class="progress-row">
+				<div
+					class="progress-bar"
+					role="progressbar"
+					aria-label="Items checked"
+					aria-valuemin={0}
+					aria-valuemax={totalItems}
+					aria-valuenow={checkedCount}
+				>
+					<div class="progress-fill" style:width="{progress}%"></div>
+				</div>
+				<span class="progress-text">
+					{checkedCount} of {totalItems}{#if generatedAt}&nbsp;· <span
+							class="generated-at"
+							title="Generated {new Date(generatedAt).toLocaleString()}"
+							>{new Date(generatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span
+						>{/if}
+				</span>
+			</div>
 		{/if}
 	</div>
 
@@ -268,12 +352,22 @@
 		<label class="sr-only" for="shopping-add-input">Add item to list</label>
 		<input
 			id="shopping-add-input"
+			type="text"
 			bind:value={newItemText}
-			placeholder="Add item (e.g. toothpaste)"
+			placeholder="Add an item"
 			onkeydown={(e) => e.key === "Enter" && addCustomItem()}
 		/>
-		<button onclick={addCustomItem}>Add</button>
+		<button class="clickable-icon add-btn" aria-label="Add item" onclick={addCustomItem}
+			><span use:obsidianIcon={"plus"} aria-hidden="true"></span></button>
 	</div>
+
+	{#if listTitles.length > 0}
+		<div class="legend" aria-label="Recipes on this list">
+			{#each listTitles as title, i (title)}
+				<span class="legend-item"><span class="dot" style:--dot={dotColor(i)}></span>{title}</span>
+			{/each}
+		</div>
+	{/if}
 
 	{#if totalItems === 0}
 		<p class="no-items-msg">
@@ -286,9 +380,13 @@
 		{#each groups as group (group.key)}
 			{@const category = group.category}
 			{@const ci = category === undefined ? -1 : categoryGroups.indexOf(group)}
+			{@const split = splitDone(group.items)}
+			{@const doneOpen = openDone.includes(group.key)}
+			{@const finished = split.todo.length === 0}
 			<div
 				class="category-group"
 				class:aisle-group={category === undefined}
+				class:is-finished={finished}
 				class:drag-over={category !== undefined && dragOver === category}
 				class:dragging={category !== undefined && dragSource === category}
 				draggable={category !== undefined}
@@ -308,8 +406,11 @@
 						<span class="aisle-detail">{group.detail}</span>
 					{/if}
 					<span class="category-count">
-						{group.items.filter((i) => i.checked).length}/{group
-							.items.length}
+						{#if finished}
+							<span class="done-mark" use:obsidianIcon={"check"} aria-label="All done"></span>
+						{:else}
+							{split.done.length}/{group.items.length}
+						{/if}
 					</span>
 					{#if category !== undefined}
 						<div class="reorder-btns" role="group" aria-label="Reorder {category}">
@@ -328,36 +429,26 @@
 						</div>
 					{/if}
 				</div>
-				<ul class="item-list">
-					{#each group.items as item (item.id)}
-						<li class:checked={item.checked}>
-							<label class="item-label">
-								<input
-									type="checkbox"
-									checked={item.checked}
-									onchange={() => toggleItem(item)}
-								/>
-								<span class="item-content">
-									<span class="item-text">
-										{#if item.quantity !== null}{formatQty(item.quantity)}&nbsp;{/if}{#if item.unit}{item.unit}&nbsp;{/if}{item.text}
-									</span>
-									{#if item.prep}
-										<span class="item-prep">{item.prep}</span>
-									{/if}
-									{#if item.recipeTitle}
-										<span class="item-source">{item.recipeTitle}</span>
-									{/if}
-								</span>
-							</label>
-							{#if item.source === "custom"}
-								<button
-									class="remove-btn"
-									onclick={() => removeCustomItem(item.id)}
-									aria-label="Remove {item.text}"><span use:obsidianIcon={"x"} aria-hidden="true"></span></button>
-							{/if}
-						</li>
-					{/each}
-				</ul>
+				{#if split.todo.length > 0}
+					<ul class="item-list">
+						{#each split.todo as item (item.id)}
+							{@render itemRow(item)}
+						{/each}
+					</ul>
+				{/if}
+				{#if split.done.length > 0}
+					<button class="done-toggle" aria-expanded={doneOpen} onclick={() => toggleDone(group.key)}>
+						<span use:obsidianIcon={doneOpen ? "chevron-down" : "chevron-right"} aria-hidden="true"></span>
+						{split.done.length} done
+					</button>
+					{#if doneOpen}
+						<ul class="item-list done-list">
+							{#each split.done as item (item.id)}
+								{@render itemRow(item)}
+							{/each}
+						</ul>
+					{/if}
+				{/if}
 			</div>
 		{/each}
 	{/if}
@@ -376,16 +467,32 @@
 
 	.header {
 		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		flex-wrap: wrap;
+		flex-direction: column;
+		gap: var(--size-4-1);
 	}
 
+	.title-row {
+		display: flex;
+		align-items: center;
+		gap: var(--size-4-1);
+		min-width: 0;
+	}
+
+
 	.header h3 {
-		margin: 0;
 		flex: 1;
-		font-size: 1.1em;
-		font-weight: 600;
+		min-width: 0;
+		margin: 0;
+		font-size: var(--font-ui-medium);
+		font-weight: var(--font-semibold);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.title-row > :global(.clickable-icon),
+	.title-row > select {
+		flex-shrink: 0;
 	}
 
 	.store-select {
@@ -400,25 +507,49 @@
 	}
 
 	.generated-at {
-		font-size: 0.75em;
-		color: var(--text-muted);
+		font-size: var(--font-ui-smaller);
+		color: var(--text-faint);
+		white-space: nowrap;
 	}
 
-	.progress {
-		font-size: 0.85em;
-		color: var(--text-accent);
-		font-weight: 600;
+	.progress-row {
+		display: flex;
+		align-items: center;
+		gap: var(--size-4-2);
+	}
+
+	.progress-bar {
+		flex: 1;
+		height: 4px;
+		border-radius: 2px;
+		background: var(--background-modifier-border);
+		overflow: hidden;
+	}
+
+	.progress-fill {
+		height: 100%;
+		background: var(--interactive-accent);
+	}
+
+	@media (prefers-reduced-motion: no-preference) {
+		.progress-fill {
+			transition: width 0.2s;
+		}
+	}
+
+	.progress-text {
+		font-size: var(--font-ui-smaller);
+		color: var(--text-muted);
+		white-space: nowrap;
 	}
 
 	.reset-btn {
-		font-size: 0.78em;
-		padding: 1px 6px;
-		background: none;
-		border: 1px solid var(--background-modifier-border);
-		border-radius: 3px;
-		color: var(--text-muted);
-		cursor: pointer;
 		white-space: nowrap;
+		font-size: var(--font-ui-smaller);
+	}
+
+	.clickable-icon.is-active {
+		color: var(--text-accent);
 	}
 
 	.reset-btn:hover,
@@ -455,7 +586,11 @@
 		opacity: 0.5;
 	}
 
+	/* Stays in view while scrolling through its aisle */
 	.category-header {
+		position: sticky;
+		top: 0;
+		z-index: 1;
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
@@ -468,9 +603,27 @@
 		border-radius: 5px 5px 0 0;
 	}
 
+	.category-group.is-finished .category-header {
+		border-radius: 5px;
+		color: var(--text-muted);
+	}
+
+	.done-mark {
+		display: inline-flex;
+		color: var(--color-green);
+		--icon-size: 14px;
+	}
+
+	/* Float over the heading on hover, so hidden buttons take no width */
 	.reorder-btns {
+		position: absolute;
+		right: 4px;
+		top: 50%;
+		transform: translateY(-50%);
 		display: flex;
 		gap: 2px;
+		padding-left: 4px;
+		background: var(--background-secondary);
 		opacity: 0;
 		transition: opacity 0.1s;
 	}
@@ -488,8 +641,8 @@
 		font-size: 0.85em;
 		border-radius: 3px;
 		line-height: 1;
-		min-height: 44px;
-		min-width: 44px;
+		min-height: 28px;
+		min-width: 28px;
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -550,10 +703,10 @@
 
 	.item-list li {
 		display: flex;
-		align-items: flex-start;
+		align-items: center;
 		gap: 6px;
 		padding: 3px 8px;
-		font-size: 0.88em;
+		font-size: 0.9em;
 	}
 
 	.item-list li:hover {
@@ -562,9 +715,10 @@
 
 	.item-label {
 		display: flex;
-		align-items: flex-start;
-		gap: 6px;
+		align-items: center;
+		gap: 8px;
 		flex: 1;
+		min-width: 0;
 		cursor: pointer;
 	}
 
@@ -575,26 +729,84 @@
 		min-width: 0;
 	}
 
-	.item-text {
+	/* Flows like a sentence, so a narrow sidebar wraps between words */
+	.item-line {
+		min-width: 0;
 		overflow-wrap: break-word;
-		word-break: break-word;
 	}
 
-	li.checked .item-text {
-		text-decoration: line-through;
+	.item-qty {
+		font-variant-numeric: tabular-nums;
 		color: var(--text-muted);
+		white-space: nowrap;
+		margin-right: 0.35em;
+	}
+
+	li.checked .item-text,
+	li.checked .item-qty {
+		text-decoration: line-through;
+		color: var(--text-faint);
 	}
 
 	.item-prep {
-		font-size: 0.78em;
+		font-size: 0.8em;
 		color: var(--text-muted);
 	}
 
-	.item-source {
-		font-size: 0.75em;
-		color: var(--text-faint);
-		font-style: italic;
+	/* One dot per recipe the item came from; names on hover */
+	.item-dots {
+		display: inline-flex;
+		gap: 3px;
+		flex-shrink: 0;
 	}
+
+	.dot {
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		background: var(--dot);
+		flex-shrink: 0;
+	}
+
+	.legend {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		font-size: var(--font-ui-smaller);
+		color: var(--text-muted);
+	}
+
+	.legend-item {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		min-width: 0;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.done-toggle {
+		all: unset;
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		padding: 2px 8px 6px;
+		font-size: var(--font-ui-smaller);
+		color: var(--text-faint);
+		cursor: pointer;
+		--icon-size: 12px;
+	}
+
+	.done-toggle:hover,
+	.done-toggle:focus-visible {
+		color: var(--text-muted);
+	}
+
+	.done-list {
+		padding-top: 0;
+	}
+
 
 	.remove-btn {
 		background: none;
@@ -637,13 +849,13 @@
 
 	.add-row {
 		display: flex;
-		gap: 6px;
-		padding-bottom: 0.5rem;
-		border-bottom: 1px solid var(--background-modifier-border);
+		align-items: center;
+		gap: 4px;
 	}
 
 	.add-row input {
 		flex: 1;
-		font-size: 0.88em;
+		min-width: 0;
+		font-size: 0.9em;
 	}
 </style>

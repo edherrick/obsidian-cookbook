@@ -1,15 +1,18 @@
 <script lang="ts">
-	const { value, onDecrement, onIncrement } = $props<{
+	const { value, onDecrement, onIncrement, compact = false } = $props<{
 		value: number;
 		onDecrement: () => void;
 		onIncrement: () => void;
+		/** Small enough to sit inside a recipe card's Cook soon chip. */
+		compact?: boolean;
 	}>();
 </script>
 
-<span class="multiplier">
+<span class="multiplier" class:compact>
 	<button
 		class="mult-btn"
 		aria-label="Decrease multiplier"
+		disabled={value <= 1}
 		onclick={onDecrement}
 	>−</button>
 	<span class="mult-label" aria-live="polite">×{value}</span>
@@ -39,9 +42,14 @@
 		line-height: 1;
 	}
 
-	.mult-btn:hover {
+	.mult-btn:hover:not(:disabled) {
 		color: var(--text-normal);
 		border-color: var(--text-accent);
+	}
+
+	.mult-btn:disabled {
+		opacity: 0.4;
+		cursor: default;
 	}
 
 	.mult-label {
@@ -50,5 +58,23 @@
 		font-weight: 600;
 		min-width: 2em;
 		text-align: center;
+	}
+
+	.multiplier.compact {
+		gap: 0;
+		padding-right: 2px;
+	}
+
+	.compact .mult-btn {
+		border: none;
+		box-shadow: none;
+		min-height: 28px;
+		min-width: 24px;
+		padding: 0 4px;
+	}
+
+	.compact .mult-label {
+		min-width: 1.6em;
+		font-size: var(--font-ui-smaller);
 	}
 </style>

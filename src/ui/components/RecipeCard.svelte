@@ -4,6 +4,7 @@
 	import { obsidianIcon } from "../../utils/obsidianIcon";
 	import { resolveCoverSrc } from "../../utils/coverImage";
 	import { SvelteModalWrapper } from "../../utils/SvelteModalWrapper";
+	import { cardMeta, isUntried } from "../../recipes/browse";
 	import RecipeDetailModal from "../modals/RecipeDetailModal.svelte";
 	import MultiplierControl from "./MultiplierControl.svelte";
 
@@ -33,6 +34,28 @@
 
 	// Covers may be URLs, vault paths or wikilinks — all need resolving to a src
 	const coverSrc = $derived(resolveCoverSrc(app, recipe[coverProp], recipe.path as string));
+	let coverFailed = $state(false);
+
+	const title = $derived(String(recipe.title ?? recipe.path ?? "Untitled"));
+	const cookSoon = $derived(!!recipe[cookSoonProp]);
+	const together = $derived(!!recipe.cook_together);
+	const multiplier = $derived((recipe.cook_multiplier as number | undefined) ?? 1);
+	const meta = $derived(
+		cardMeta(
+			recipe,
+			propsToShow.filter((k: string) => k !== coverProp && k !== cookSoonProp && k !== cookTogetherProp),
+		),
+	);
+	const untried = $derived(isUntried(recipe));
+
+	/** A theme colour picked by the title, so a recipe keeps its tile colour. */
+	const TINTS = ["red", "orange", "yellow", "green", "cyan", "blue", "purple", "pink"];
+	const tint = $derived.by(() => {
+		let hash = 0;
+		for (const ch of title) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+		return `var(--color-${TINTS[hash % TINTS.length]})`;
+	});
+	const initial = $derived(title.trim().charAt(0).toUpperCase() || "?");
 
 	function openDetail() {
 		new SvelteModalWrapper(app, RecipeDetailModal, {
@@ -42,182 +65,238 @@
 			cookTogetherProp,
 			coverProp,
 			cooksWellWith: getOverlap?.(recipe.path) ?? [],
-			onToggleCookSoon: () =>
-				onToggleCookSoon && onToggleCookSoon(recipe.path),
-			onToggleCookTogether: () =>
-				onToggleCookTogether && onToggleCookTogether(recipe.path),
-			onSetMultiplier: (m: number) =>
-				onSetMultiplier && onSetMultiplier(recipe.path, m),
+			onToggleCookSoon: () => onToggleCookSoon?.(recipe.path),
+			onToggleCookTogether: () => onToggleCookTogether?.(recipe.path),
+			onSetMultiplier: (m: number) => onSetMultiplier?.(recipe.path, m),
 		}).open();
 	}
 </script>
 
-<div class="recipe-card">
-	{#if coverSrc}
-		<div class="recipe-cover-wrap">
-			<img
-				class="recipe-cover"
-				src={coverSrc}
-				alt={recipe.title || "No title"}
-				loading="lazy"
-			/>
-		</div>
-	{/if}
-
-	{#if recipe.title}
-		<h2 class="recipe-title">
-			<button
-				class="recipe-link"
-				onclick={openDetail}
-				aria-label="View recipe: {recipe.title}"
-			>
-				<span class="title-text">{recipe.title}</span>
-				<span
-					use:obsidianIcon={"eye"}
-					class="recipe-icon"
-					aria-hidden="true"
-				></span>
-			</button>
-		</h2>
-	{/if}
-
-	<div class="recipe-body">
-		{#each propsToShow.filter((key: string) => key in recipe && key !== "title" && key !== coverProp && key !== cookSoonProp && key !== cookTogetherProp) as key (key)}
-			<span class="field-key">{key}</span>
-			<span class="field-colon">:</span>
-			<span class="field-value">{recipe[key]}</span>
-		{/each}
-
-		<!-- Cook-soon toggle always shown -->
-		<span class="field-key">cook soon</span>
-		<span class="field-colon">:</span>
-		<span class="field-value cook-soon-row">
-			<input
-				type="checkbox"
-				aria-label="Cook {recipe.title ?? recipe.path} soon"
-				checked={recipe[cookSoonProp]}
-				onchange={() => onToggleCookSoon && onToggleCookSoon(recipe.path)}
-			/>
-			{#if recipe[cookSoonProp]}
-				<MultiplierControl
-					value={recipe.cook_multiplier ?? 1}
-					onDecrement={() => onSetMultiplier && onSetMultiplier(recipe.path, Math.max(1, (recipe.cook_multiplier ?? 1) - 1))}
-					onIncrement={() => onSetMultiplier && onSetMultiplier(recipe.path, (recipe.cook_multiplier ?? 1) + 1)}
-				/>
-			{/if}
-		</span>
-
-		<span class="field-key">cook together</span>
-		<span class="field-colon">:</span>
-		<span class="field-value cook-soon-row">
-			<input
-				type="checkbox"
-				aria-label="Cook {recipe.title ?? recipe.path} together"
-				checked={!!recipe.cook_together}
-				onchange={() => onToggleCookTogether && onToggleCookTogether(recipe.path)}
-			/>
-		</span>
+<article class="cookbook-card" class:is-cook-soon={cookSoon}>
+	<div class="cookbook-cover">
+		{#if coverSrc && !coverFailed}
+			<img src={coverSrc} alt="" loading="lazy" onerror={() => (coverFailed = true)} />
+		{:else}
+			<div class="cookbook-cover-tile" style:--tint={tint} aria-hidden="true">{initial}</div>
+		{/if}
+		{#if untried}
+			<span class="cookbook-badge-new" title="Not tried yet">New</span>
+		{/if}
 	</div>
-</div>
+
+	<div class="cookbook-card-body">
+		<h3 class="cookbook-card-title">
+			<!-- Stretched over the whole card, so a click anywhere opens the recipe -->
+			<button class="cookbook-card-open" onclick={openDetail}>{title}</button>
+		</h3>
+		{#if meta.length > 0}
+			<p class="cookbook-card-meta">{meta.join(" · ")}</p>
+		{/if}
+
+		<div class="cookbook-card-actions">
+			<span class="chip" class:is-on={cookSoon}>
+				<button
+					class="chip-toggle"
+					aria-pressed={cookSoon}
+					title={cookSoon ? "On the shopping list" : "Add to the shopping list"}
+					onclick={() => onToggleCookSoon?.(recipe.path)}
+				>
+					<span class="chip-icon" use:obsidianIcon={"shopping-cart"} aria-hidden="true"></span>
+					Cook soon
+				</button>
+				{#if cookSoon}
+					<MultiplierControl
+						compact
+						value={multiplier}
+						onDecrement={() => onSetMultiplier?.(recipe.path, Math.max(1, multiplier - 1))}
+						onIncrement={() => onSetMultiplier?.(recipe.path, multiplier + 1)}
+					/>
+				{/if}
+			</span>
+			<span class="chip" class:is-on={together}>
+				<button
+					class="chip-toggle"
+					aria-pressed={together}
+					title={together ? "In the next cooking session" : "Cook in the next session"}
+					onclick={() => onToggleCookTogether?.(recipe.path)}
+				>
+					<span class="chip-icon" use:obsidianIcon={"cooking-pot"} aria-hidden="true"></span>
+					Together
+				</button>
+			</span>
+		</div>
+	</div>
+</article>
 
 <style>
-	.recipe-card {
+	.cookbook-card {
+		position: relative;
+		display: flex;
+		flex-direction: column;
+		align-items: stretch;
+		text-align: start;
 		background: var(--background-secondary);
 		border: 1px solid var(--background-modifier-border);
 		border-radius: var(--radius-m);
 		overflow: hidden;
-		width: 100%;
-		box-shadow: var(--shadow-s);
 		box-sizing: border-box;
+		min-width: 0;
 	}
 
-	/* Wrapper reserves space before the image loads, preventing layout shift.
-	   aspect-ratio scales proportionally on any card width (mobile or desktop).
-	   max-height caps it on very wide cards. */
-	.recipe-cover-wrap {
+	@media (prefers-reduced-motion: no-preference) {
+		.cookbook-card {
+			transition: border-color 0.15s, box-shadow 0.15s;
+		}
+	}
+
+	.cookbook-card:hover {
+		border-color: var(--background-modifier-border-hover);
+		box-shadow: var(--shadow-s);
+	}
+
+	.cookbook-card.is-cook-soon {
+		border-color: var(--interactive-accent);
+	}
+
+	.cookbook-card:has(.cookbook-card-open:focus-visible) {
+		box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
+	}
+
+	/* Every card's cover is the same shape, image or not */
+	.cookbook-cover {
+		position: relative;
+		display: block;
 		width: 100%;
-		aspect-ratio: 16 / 9;
-		max-height: 220px;
 		overflow: hidden;
-		background: var(--background-secondary);
-		flex-shrink: 0;
+		aspect-ratio: 16 / 10;
+		background: var(--background-primary-alt);
 	}
 
-	.recipe-cover {
+	.cookbook-cover img {
 		width: 100%;
 		height: 100%;
 		object-fit: cover;
 		display: block;
 	}
 
-	.recipe-title {
-		font-size: 1rem;
-		font-weight: 600;
-		margin: 0;
-		padding: 0.5rem;
-		text-align: center;
-	}
-
-	.recipe-link {
-		display: inline-flex;
+	.cookbook-cover-tile {
+		width: 100%;
+		height: 100%;
+		display: flex;
 		align-items: center;
 		justify-content: center;
-		width: 100%;
-		background: none;
-		border: none;
-		padding: 0;
-		color: inherit;
+		background: color-mix(in srgb, var(--tint) 18%, var(--background-secondary));
+		color: color-mix(in srgb, var(--tint) 75%, var(--text-normal));
+		font-size: 2.6em;
+		font-weight: var(--font-semibold);
+	}
+
+	.cookbook-badge-new {
+		position: absolute;
+		top: var(--size-4-2);
+		left: var(--size-4-2);
+		padding: 1px 8px;
+		border-radius: var(--radius-l);
+		background: var(--interactive-accent);
+		color: var(--text-on-accent);
+		font-size: var(--font-ui-smaller);
+		font-weight: var(--font-semibold);
+	}
+
+	.cookbook-card-body {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		gap: var(--size-2-2);
+		padding: var(--size-4-2) var(--size-4-3) var(--size-4-3);
+	}
+
+	.cookbook-card-title {
+		margin: 0;
+		font-size: var(--font-ui-medium);
+		font-weight: var(--font-semibold);
+		line-height: 1.3;
+	}
+
+	.cookbook-card-open {
+		all: unset;
 		cursor: pointer;
-		text-align: center;
-		border-radius: var(--radius-s);
-	}
-
-	.recipe-link:hover,
-	.recipe-link:focus {
-		background: var(--background-modifier-hover);
-	}
-
-	.title-text {
-		flex: 1 1 0;
-		min-width: 0;
-		overflow-wrap: break-word;
-		white-space: normal;
-		text-align: center;
-	}
-
-	.recipe-icon {
-		margin-left: 0.25rem;
-	}
-
-	.recipe-body {
-		padding: 0.5rem;
-		display: grid;
-		grid-template-columns: max-content 0.6rem 1fr;
-		column-gap: 0.4rem;
-		row-gap: 0.25rem;
-		align-items: baseline;
-	}
-
-	.field-key {
-		text-align: right;
-		font-weight: bold;
-		color: var(--text-muted);
-		white-space: nowrap;
-	}
-
-	.field-colon {
-		text-align: center;
-		opacity: 0.6;
-	}
-
-	.field-value {
-		text-align: left;
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		line-clamp: 2;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
 		overflow-wrap: anywhere;
 	}
 
-	.cook-soon-row {
+	.cookbook-card-open::after {
+		content: "";
+		position: absolute;
+		inset: 0;
+	}
+
+	.cookbook-card-meta {
+		margin: 0;
+		font-size: var(--font-ui-small);
+		color: var(--text-muted);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	/* Above the stretched open button, so they stay clickable */
+	.cookbook-card-actions {
+		position: relative;
+		z-index: 1;
 		display: flex;
+		flex-wrap: wrap;
+		gap: var(--size-4-1);
+		margin-top: auto;
+		padding-top: var(--size-4-2);
+	}
+
+	.chip {
+		display: inline-flex;
 		align-items: center;
-		gap: 6px;
+		gap: 2px;
+		border: 1px solid var(--background-modifier-border);
+		border-radius: var(--radius-l);
+		background: var(--background-primary);
+		overflow: hidden;
+	}
+
+	.chip.is-on {
+		border-color: var(--interactive-accent);
+		background: color-mix(in srgb, var(--interactive-accent) 14%, var(--background-primary));
+	}
+
+	.chip-toggle {
+		all: unset;
+		display: inline-flex;
+		align-items: center;
+		gap: var(--size-2-2);
+		padding: var(--size-2-2) var(--size-4-2);
+		min-height: 28px;
+		box-sizing: border-box;
+		cursor: pointer;
+		font-size: var(--font-ui-smaller);
+		color: var(--text-muted);
+	}
+
+	.chip.is-on .chip-toggle {
+		color: var(--text-normal);
+	}
+
+	.chip-toggle:hover {
+		color: var(--text-normal);
+	}
+
+	.chip-toggle:focus-visible {
+		box-shadow: inset 0 0 0 2px var(--background-modifier-border-focus);
+	}
+
+	.chip-icon {
+		display: inline-flex;
+		--icon-size: 14px;
 	}
 </style>
