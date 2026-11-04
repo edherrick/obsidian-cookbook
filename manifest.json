@@ -3,7 +3,7 @@
 	"name": "Cookbook",
 	"version": "2.0.0",
 	"minAppVersion": "1.13.1",
-	"description": "A cookbook for Obsidian, to view / filter recipes and generate shopping lists",
+	"description": "Browse and filter your recipe notes, plan cooking sessions, and generate shopping lists sorted by store aisle.",
 	"author": "Digon",
 	"authorUrl": "https://github.com/edherrick",
 	"fundingUrl": "https://buymeacoffee.com/digon",

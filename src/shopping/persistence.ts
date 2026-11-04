@@ -148,7 +148,7 @@ export class ShoppingListPersistence {
 			this.lastWrittenContent = content;
 			const file = this.deps.app.vault.getFileByPath(path);
 			if (file instanceof TFile) {
-				await this.deps.app.vault.modify(file, content);
+				await this.deps.app.vault.process(file, () => content);
 			} else {
 				await this.deps.app.vault.create(path, content);
 			}
@@ -159,9 +159,9 @@ export class ShoppingListPersistence {
 
 	private async ensureDirectoryExists(dir: string): Promise<void> {
 		if (!dir || dir === ".") return;
-		if (await this.deps.app.vault.adapter.exists(dir)) return;
+		if (this.deps.app.vault.getFolderByPath(dir)) return;
 		const parent = dir.split("/").slice(0, -1).join("/");
 		if (parent) await this.ensureDirectoryExists(parent);
-		await this.deps.app.vault.adapter.mkdir(dir);
+		await this.deps.app.vault.createFolder(dir);
 	}
 }

@@ -171,7 +171,7 @@ export async function writeCookSessionNote(
 	});
 
 	if (existing instanceof TFile) {
-		await app.vault.modify(existing, content);
+		await app.vault.process(existing, () => content);
 		return existing;
 	}
 	const folder = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
