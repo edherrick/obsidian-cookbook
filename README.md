@@ -298,17 +298,6 @@ The technique tag prefix (default `prep`) and the ordered technique list. Order 
 
 **Ignored categories** — categories whose ingredients are left out of overlap scoring. Staples are set under **Ingredients → Staples**.
 
-## Upgrading to 2.0
-
-2.0 replaces the separate keyword lists (category keywords, dietary keywords and exclusions, aliases, staples) with the ingredient list. Your settings are converted once, the first time 2.0 loads:
-
-- every keyword becomes an ingredient, tagged so that each recipe line is filed, grouped and flagged exactly as before
-- the old lists are kept in the plugin's `data.json` under `legacyKeywordLists`
-
-Because the old lists were matched as words, some tags carry over from shorter words inside longer names — `peanut butter` marked staple through `butter`, for example. They behaved that way before too; now they're visible, and **Ingredients → Staples** is the quickest place to tidy them.
-
-**Update the plugin on every device you sync.** An older version reading 2.0 settings files everything as Uncategorized, and keyword edits made there are not picked up by 2.0.
-
 ## Installation
 
 ### Community plugins (recommended)
