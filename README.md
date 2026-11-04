@@ -2,6 +2,8 @@
 
 An [Obsidian](https://obsidian.md) plugin to browse your recipe notes, filter them by frontmatter properties, and generate categorised shopping lists.
 
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-support-yellow)](https://buymeacoffee.com/digon)
+
 ## Features
 
 - **Recipe grid** — view all your recipe notes in a card layout with cover images and frontmatter fields
