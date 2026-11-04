@@ -124,6 +124,8 @@ Settings → **Ingredients** is the one place an ingredient is described. Each i
 - **other names** — `scallion` also answers to `green onion` and `spring onion`. Lines using any of its names merge on the shopping list, count as overlap and match ingredient filters
 - a **staple** flag for things nearly every recipe uses
 
+The default categories, in default walking order, are Produce, Bakery, Deli, Meat & Fish, Dairy & Eggs, Pantry, Baking & Spices, Condiments & Sauces, Drinks, Frozen and Household & Other (for things like toothpaste). The list button above the ingredients adds any starter ingredients you don't have.
+
 Search the list by name, category or tag (`Dairy`, `staple`). **Categories**, **Dietary groups** and **Staples** sit at the top of the page; renaming or deleting a category or group updates every ingredient, store aisle and the current shopping list.
 
 **Find duplicates and missing ingredients** scans your recipes. Names that aren't in the list get an **Add** button, which creates the ingredient with a best guess at its category and groups for you to check. Likely duplicates — `apple` / `red apple`, `ceasar` / `caesar` — can be merged, which makes one name another name of the other.
@@ -170,6 +172,15 @@ A line is filed by the ingredient it names. A line that is exactly an ingredient
 That is what keeps `full-fat coconut milk` in **Pantry** (`coconut milk` is longer than `milk`) and `horseradish cheddar cheese` in **Dairy & Eggs** (`radish` doesn't match inside `horseradish`). Lines only merge when they name the same ingredient exactly, so `blueberries` and `raspberries` stay two lines.
 
 Items that match no ingredient fall into **Uncategorized** at the bottom of the list.
+
+#### Store layouts
+
+A store layout says *where things are in one shop*; categories say *what* an ingredient is. Open a store under **Settings → Cookbook → Store layouts**:
+
+- **Numbered aisles** — give an aisle a number, pick the categories shelved there, and under **Also here** pick single ingredients this shop keeps there whatever their category (soy sauce in International, say). On the shopping list, numbered aisles come first, in number order.
+- **Categories not in an aisle** — everything else, in the order you walk it. Drag to reorder here, or drag categories in the shopping list itself; the order is saved into the active store.
+
+A store with no numbered aisles is simply its category order. With more than one store, a picker appears in the shopping list header and switching re-sorts the list. **Duplicate store** is the quick way to start a new shop from one you already know.
 
 ### Filtering recipes
 
@@ -237,68 +248,14 @@ Add, rename or remove dietary groups under **Ingredients → Dietary groups**, a
 
 ## Settings
 
-### Properties to display
+Every setting is described where you change it, under **Settings → Cookbook**. By default, recipes are notes tagged `#recipe` anywhere in the vault, and the plugin uses the frontmatter keys `cook-soon`, `cook-together` and `cover`.
 
-A comma-separated list of frontmatter properties to show on each recipe card (e.g. `title, cook-time, servings, cover`).
-
-### Recipes folder
-
-Restrict recipe scanning to a specific folder. Defaults to the entire vault.
-
-### Recipes tag
-
-The tag that identifies a note as a recipe. Defaults to `#recipe`.
-
-### Cook-soon property
-
-The frontmatter key used to mark a recipe as cook-soon. Defaults to `cook-soon`. Change this if your vault already uses a different key.
-
-### Cover image property
-
-The frontmatter key holding each recipe's cover image. Defaults to `cover`. The value can be a URL, a vault-relative path, a wikilink (`[[cover.png]]`) or a markdown image — all of them resolve to the right picture on the recipe card and in the detail view.
-
-### Ignore paths
-
-A list of folders or files to exclude from recipe scanning. Useful for template folders or example notes.
-
-### Hide checked items
-
-When enabled, checking off a shopping list item removes it from the list immediately instead of showing a strikethrough. Useful for a cleaner shopping experience.
-
-### Preferred volume unit / preferred weight unit
-
-Choose which unit to use when displaying aggregated volume or weight quantities on the shopping list (e.g. prefer `cups` over `ml`). Defaults to auto, which uses whichever unit appears first.
-
-### Ingredients
-
-The ingredient list (see [The ingredient list](#the-ingredient-list)), with three pages at the top:
-
-- **Categories** — names only, with how many ingredients use each. Default categories, in default walking order: Produce, Bakery, Deli, Meat & Fish, Dairy & Eggs, Pantry, Baking & Spices, Condiments & Sauces, Drinks, Frozen, Household & Other. **Household & Other** catches non-food items you add by hand, such as toothpaste. You can also create a category from any ingredient's **Category** dropdown.
-- **Dietary groups** — names only. Ten are pre-configured, with fish and shellfish, and tree nuts and peanuts, kept apart as distinct allergens.
-- **Staples** — every staple as one block; removing one clears that ingredient's **Staple** switch.
-
-The list button above the ingredients adds any starter ingredients you don't have, which is also how you pick up additions from a plugin update.
-
-### Store layouts
-
-A store layout says *where things are in one shop*; categories say *what* an ingredient is. Open a store to set it up:
-
-- **Numbered aisles** — give an aisle a number, pick the categories shelved there, and under **Also here** pick single ingredients this shop keeps there whatever their category (soy sauce in International, say). On the shopping list, numbered aisles come first, in number order.
-- **Categories not in an aisle** — everything else, in the order you walk it. Drag to reorder here, or drag categories in the shopping list itself; the order is saved into the active store.
-
-A store with no numbered aisles is simply its category order. With more than one store, a picker appears in the shopping list header and switching re-sorts the list. **Duplicate store** is the quick way to start a new shop from one you already know.
-
-### Cooking sessions
-
-The cook-together property (default `cook-together`) and the folder session notes are written to (default `recipes/cook sessions`).
-
-### Prep techniques
-
-The technique tag prefix (default `prep`) and the ordered technique list. Order is prep order; keywords are the untagged words that count as the technique.
-
-### Overlap
-
-**Ignored categories** — categories whose ingredients are left out of overlap scoring. Staples are set under **Ingredients → Staples**.
+| Section | What it covers |
+| --- | --- |
+| **Recipes** | Which notes are recipes (folder, tag, ignored paths), the properties shown on cards, and the frontmatter keys for the **Shopping list** toggle and the cover image. A cover can be a URL, a vault path, a wikilink or a markdown image. |
+| **Shopping list** | Preferred units, hiding checked items, saving the list to a note, and the [Ingredients](#the-ingredient-list) and [Store layouts](#store-layouts) pages. |
+| **Cooking sessions** | The frontmatter key for the **Cook session** toggle, the session folder, and prep techniques with their tag prefix. |
+| **Overlap** | Categories left out of [Cooks well with](#cooks-well-with). |
 
 ## Installation
 
