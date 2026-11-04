@@ -1,3 +1,5 @@
+// Runs in Node; the plugin source deliberately doesn't load Node's types
+/// <reference types="node" />
 import obsidianmd from "eslint-plugin-obsidianmd";
 import globals from "globals";
 import { defineConfig, globalIgnores } from "eslint/config";

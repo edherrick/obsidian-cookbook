@@ -28,7 +28,7 @@ describe("renameCategory", () => {
 
 	it("ignores a rename to an empty name", () => {
 		const s = cloneDefaultSettings();
-		const before = structuredClone(s);
+		const before = structuredClone(s) as typeof s;
 		renameCategory(s, "Pantry", "  ");
 		expect(s).toEqual(before);
 	});
