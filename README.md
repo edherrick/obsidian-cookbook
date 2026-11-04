@@ -276,3 +276,7 @@ Every setting is described where you change it, under **Settings → Cookbook**.
 Always wondered if I could make a dollar from a project. If you find this plugin useful, you can support development here:
 
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-support-yellow)](https://buymeacoffee.com/digon)
+
+## License
+
+[MIT](LICENSE)
