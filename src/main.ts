@@ -248,6 +248,11 @@ export default class CookbookPlugin extends Plugin {
 		});
 	}
 
+	/** Rebuild the shopping list from every recipe marked for it, and show it. */
+	generateShoppingList(): Promise<void> {
+		return this.shopping.generate();
+	}
+
 	/** Carry a category rename (or deletion, with `to` null) into the current shopping list. */
 	renameShoppingListCategory(from: string, to: string | null): Promise<void> {
 		return this.shopping.renameCategory(from, to);

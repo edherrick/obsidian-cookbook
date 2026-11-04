@@ -79,9 +79,6 @@
 		{:else}
 			<div class="cookbook-cover-tile" style:--tint={tint} aria-hidden="true">{initial}</div>
 		{/if}
-		{#if untried}
-			<span class="cookbook-badge-new" title="Not tried yet">New</span>
-		{/if}
 	</div>
 
 	<div class="cookbook-card-body">
@@ -89,8 +86,10 @@
 			<!-- Stretched over the whole card, so a click anywhere opens the recipe -->
 			<button class="cookbook-card-open" onclick={openDetail}>{title}</button>
 		</h3>
-		{#if meta.length > 0}
-			<p class="cookbook-card-meta">{meta.join(" · ")}</p>
+		{#if meta.length > 0 || untried}
+			<p class="cookbook-card-meta">
+				{meta.join(" · ")}{#if untried}{#if meta.length > 0}&nbsp;·&nbsp;{/if}<span class="not-tried">Not tried</span>{/if}
+			</p>
 		{/if}
 
 		<div class="cookbook-card-actions">
@@ -98,11 +97,11 @@
 				<button
 					class="chip-toggle"
 					aria-pressed={cookSoon}
-					title={cookSoon ? "On the shopping list" : "Add to the shopping list"}
+					title={cookSoon ? "Its ingredients are on the shopping list" : "Put its ingredients on the shopping list"}
 					onclick={() => onToggleCookSoon?.(recipe.path)}
 				>
 					<span class="chip-icon" use:obsidianIcon={"shopping-cart"} aria-hidden="true"></span>
-					Cook soon
+					Shopping list
 				</button>
 				{#if cookSoon}
 					<MultiplierControl
@@ -117,11 +116,11 @@
 				<button
 					class="chip-toggle"
 					aria-pressed={together}
-					title={together ? "In the next cooking session" : "Cook in the next session"}
+					title={together ? "In the next cooking session note" : "Include in the next cooking session note"}
 					onclick={() => onToggleCookTogether?.(recipe.path)}
 				>
 					<span class="chip-icon" use:obsidianIcon={"cooking-pot"} aria-hidden="true"></span>
-					Together
+					Cook session
 				</button>
 			</span>
 		</div>
@@ -191,16 +190,9 @@
 		font-weight: var(--font-semibold);
 	}
 
-	.cookbook-badge-new {
-		position: absolute;
-		top: var(--size-4-2);
-		left: var(--size-4-2);
-		padding: 1px 8px;
-		border-radius: var(--radius-l);
-		background: var(--interactive-accent);
-		color: var(--text-on-accent);
-		font-size: var(--font-ui-smaller);
-		font-weight: var(--font-semibold);
+	.not-tried {
+		color: var(--text-faint);
+		font-style: italic;
 	}
 
 	.cookbook-card-body {

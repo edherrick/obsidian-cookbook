@@ -157,6 +157,30 @@ export function applySetCookSoon(
 	for (const path of changed) void flushFlag(path, true, app, cookSoonProp);
 }
 
+/**
+ * Take every recipe off the shopping list (or, with `cook_together`, out of
+ * the cook session), writing only the notes that change. Clearing the
+ * shopping list also resets multipliers, so next week starts at ×1.
+ * Returns how many recipes were cleared.
+ */
+export function applyClearFlag(
+	recipesStore: Writable<Recipe[]>,
+	app: App,
+	field: "cook_soon" | "cook_together",
+	prop: string,
+): number {
+	const changed: string[] = [];
+	recipesStore.update((list) =>
+		list.map((r) => {
+			if (!r[field]) return r;
+			changed.push(r.path);
+			return { ...r, [field]: false, [prop]: false, ...(field === "cook_soon" ? { cook_multiplier: 1 } : {}) };
+		}),
+	);
+	for (const path of changed) void flushFlag(path, false, app, prop);
+	return changed.length;
+}
+
 function applyToggleFlag(
 	recipesStore: Writable<Recipe[]>,
 	path: string,

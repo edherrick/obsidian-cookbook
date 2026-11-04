@@ -8,9 +8,9 @@ An [Obsidian](https://obsidian.md) plugin to browse your recipe notes, filter th
 - **Filters** — filter recipes by any frontmatter property; supports string matching and numeric comparisons (`<`, `=`, `>`)
 - **Ingredient filters** — filter recipes by ingredient with autocomplete; supports "must contain" and "excludes" with AND/OR logic
 - **Dietary group filters** — one-click filters for named ingredient groups (Dairy, Gluten, Nuts, etc.); fully customisable
-- **Cook soon** — flag recipes you plan to make this week
+- **Shopping list toggle** — mark the recipes you plan to make this week; their ingredients go on the shopping list (saved as `cook-soon` in the note's frontmatter)
 - **Serving multiplier** — scale any recipe before generating the shopping list (×2, ×3, etc.) directly from the recipe card, detail view, or ribbon menu
-- **Shopping list** — generate a categorised, grouped shopping list from your cook-soon recipes
+- **Shopping list** — generate a categorised, grouped shopping list from the recipes you've marked
 - **Smart ingredient parsing** — quantities, units, and fractions are extracted automatically; ingredients are aggregated across recipes with unit-aware conversion
 - **Custom items** — add one-off items to the shopping list manually; they're filed by your ingredient list
 - **Store layouts** — give each shop numbered aisles (and move single ingredients where that shop keeps them); the list sorts itself into that shop's order
@@ -18,8 +18,8 @@ An [Obsidian](https://obsidian.md) plugin to browse your recipe notes, filter th
 - **Recipe detail** — click any recipe card to read the full note rendered inside Obsidian
 - **Technique tags** — tag prep on ingredient lines (`#prep/dice`, `#prep/mince`); a check command finds typos and untagged prep
 - **Ingredient list** — one list where each ingredient has a category, dietary groups, other names and a staple flag; a names panel adds the ingredients your recipes use and suggests duplicates to merge
-- **Cooks well with** — the recipe detail lists the recipes that share the most distinctive ingredients, and the browser can sort by overlap with your cook-together set
-- **Cooking sessions** — mark recipes *cook together* and generate one note with the combined equipment, a prep list grouped by technique, every recipe's steps in a cook order you can arrange by hand, and store/reheat instructions
+- **Cooks well with** — the recipe detail lists the recipes that share the most distinctive ingredients, and the browser can sort by overlap with the recipes marked for your cook session
+- **Cooking sessions** — mark recipes for the **Cook session** and generate one note with the combined equipment, a prep list grouped by technique, every recipe's steps in a cook order you can arrange by hand, and store/reheat instructions
 
 ## How It Works
 
@@ -128,11 +128,11 @@ Search the list by name, category or tag (`Dairy`, `staple`). **Categories**, **
 
 #### Cooks well with
 
-Two recipes overlap on the distinctive ingredients they share. Staples (salt, oil, dried herbs…) and the Pantry and Baking & Spices categories are ignored, since they say nothing about shopping or prepping together. Staples are set under **Ingredients → Staples**, ignored categories under **Overlap**. The recipe detail shows the top three matches with the shared ingredients, and **Sort → Overlap with cook-together set** in the browser puts the recipes that best extend your current session first.
+Two recipes overlap on the distinctive ingredients they share. Staples (salt, oil, dried herbs…) and the Pantry and Baking & Spices categories are ignored, since they say nothing about shopping or prepping together. Staples are set under **Ingredients → Staples**, ignored categories under **Overlap**. The recipe detail shows the top three matches with the shared ingredients, and **Sort → Overlap with cook session recipes** in the browser puts the recipes that best extend your current session first.
 
 #### Cooking sessions
 
-Tick **cook together** on recipes you want to batch-cook (frontmatter `cook-together: true`; separate from cook-soon). **Start cooking session** in the ribbon menu, or the command, writes `Cook session YYYY-MM-DD.md` in the session folder:
+Select **Cook session** on recipes you want to batch-cook (saved as `cook-together: true`; separate from the shopping list). **Start cooking session** in the ribbon menu, or the command, writes `Cook session YYYY-MM-DD.md` in the session folder:
 
 - **Recipes** — a colored dot per recipe, with timings and how long each keeps
 - **Equipment** — the combined `equipment` lists
@@ -143,15 +143,15 @@ Tick **cook together** on recipes you want to batch-cook (frontmatter `cook-toge
 
 **Arranging the cook order.** Each `---` block of a recipe is one step. Starting a session opens the arrange window: drag steps (or use the arrows) into the order you'll cook them, and tick **Meanwhile** on a step to do it while the step above runs, e.g. soak the cashews while the oats bake. **Save cook order** rewrites the note. The order is stored in the note's `cook-plan` frontmatter, so regenerating keeps it; steps from new or edited recipes are added at the end. Reopen the window from the *Arrange the cook order* link at the top of the note, or the **Arrange cook order** command. Before arranging, recipes run one after another: lowest `oven-temp` first, longest `cook-time` first, stovetop last. A step moved ahead of an earlier step of its own recipe is flagged, not blocked.
 
-The ribbon option *Also mark them cook soon* sends the same recipes to the shopping list. Optional recipe properties used here: `oven-temp`, `equipment`, `fridge-days`, `freezer-months`, `prep-time`, `cook-time`, `serving-size`.
+The ribbon option *Also put them on the shopping list* sends the same recipes to the shopping list. Optional recipe properties used here: `oven-temp`, `equipment`, `fridge-days`, `freezer-months`, `prep-time`, `cook-time`, `serving-size`.
 
 #### Serving multiplier
 
-Each cook-soon recipe has a `− ×1 +` stepper available on the recipe card, in the detail view, and in the ribbon menu. Setting a recipe to ×2 doubles all its quantities in the generated shopping list.
+Each recipe on the shopping list has a `− ×1 +` stepper on the recipe card (inside its **Shopping list** chip), in the detail view, and in the ribbon menu. Setting a recipe to ×2 doubles all its quantities in the generated shopping list.
 
 #### Aggregation across recipes
 
-When you generate a shopping list from multiple cook-soon recipes, identical ingredients (matched case-insensitively) are **merged into a single line**:
+When you generate a shopping list from several recipes, identical ingredients (matched case-insensitively) are **merged into a single line**:
 
 - **Same unit** — quantities are summed directly (`1 cup flour` + `2 cups flour` = `3 cups flour`)
 - **Different units, same type** — converted to a common base and summed (`1 cup milk` + `4 tbsp milk` ≈ `1 1/4 cups milk`)
@@ -206,12 +206,12 @@ Add, rename or remove dietary groups under **Ingredients → Dietary groups**, a
 
 1. Click the **utensils icon** in the ribbon to open the quick-access menu
 2. Select **Browse recipes** to browse and filter your recipes
-3. Mark recipes as **Cook soon** using the checkbox on each card or in the detail view
-4. Optionally adjust the **serving multiplier** (`− ×1 +`) on any cook-soon recipe to scale its quantities
-5. Back in the ribbon menu, click **Generate Shopping List** to build a shopping list from your cook-soon recipes
+3. Select **Shopping list** on the cards (or in the detail view) of the recipes you plan to make
+4. Optionally adjust the **serving multiplier** (`− ×1 +`) on any of them to scale its quantities
+5. Back in the ribbon menu, click **Generate Shopping List** to build a shopping list from those recipes
 6. The **Shopping List** panel opens in the right sidebar — check off items as you shop
 
-**Ribbon menu** — shows your cook-soon recipes and quick actions:
+**Ribbon menu** — shows the recipes on your shopping list and quick actions:
 
 ![Ribbon menu](docs/ribbon-icon-modal.png)
 
@@ -219,7 +219,7 @@ Add, rename or remove dietary groups under **Ingredients → Dietary groups**, a
 
 ![Cookbook browser](docs/cookbook-modal.png)
 
-**Shopping list** — categorised ingredients from your cook-soon recipes:
+**Shopping list** — categorised ingredients from the recipes you've marked:
 
 ![Shopping list](docs/shopping-list.png)
 
@@ -229,7 +229,7 @@ Add, rename or remove dietary groups under **Ingredients → Dietary groups**, a
 | --- | --- |
 | **Browse recipes** | Opens the recipe browser |
 | **Open shopping list** | Opens the shopping list sidebar panel |
-| **Start cooking session** | Writes today's session note for the cook-together recipes and opens the arrange window |
+| **Start cooking session** | Writes today's session note for the recipes marked for the cook session and opens the arrange window |
 | **Arrange cook order** | Rearranges the steps of the open session note |
 | **Check recipe technique tags** | Lists unknown technique tags and untagged prep |
 

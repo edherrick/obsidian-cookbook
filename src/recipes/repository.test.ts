@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { writable } from "svelte/store";
 import {
+	applyClearFlag,
 	applySetCookSoon,
 	applySetMultiplier,
 	applyToggleCookSoon,
@@ -297,5 +298,38 @@ describe("technique tags", () => {
 			techniqueTagPrefix: "prep",
 		});
 		expect(recipe!.technique).toEqual(["dice", "peel"]);
+	});
+});
+
+describe("applyClearFlag", () => {
+	it("clears the shopping list flag everywhere, resetting multipliers", () => {
+		const fmA: Record<string, unknown> = { tags: ["recipe"], "cook-soon": true };
+		const fmB: Record<string, unknown> = { tags: ["recipe"] };
+		const app = makeApp([
+			{ path: "a.md", frontmatter: fmA },
+			{ path: "b.md", frontmatter: fmB },
+		]);
+		const store = writable<Recipe[]>([
+			{ ...recipeFixture("a.md", { cook_soon: true, cook_multiplier: 3 }), cook_together: true },
+			recipeFixture("b.md"),
+		]);
+		expect(applyClearFlag(store, app, "cook_soon", "cook-soon")).toBe(1);
+		let list: Recipe[] = [];
+		store.subscribe((v) => (list = v))();
+		expect(list[0]).toMatchObject({ cook_soon: false, cook_multiplier: 1, cook_together: true });
+		expect(fmA["cook-soon"]).toBe(false);
+		// Untouched notes aren't rewritten
+		expect("cook-soon" in fmB).toBe(false);
+	});
+
+	it("clears the cook session without touching the shopping list", () => {
+		const fm: Record<string, unknown> = { tags: ["recipe"], "cook-together": true };
+		const app = makeApp([{ path: "a.md", frontmatter: fm }]);
+		const store = writable<Recipe[]>([{ ...recipeFixture("a.md", { cook_soon: true, cook_multiplier: 2 }), cook_together: true }]);
+		expect(applyClearFlag(store, app, "cook_together", "cook-together")).toBe(1);
+		let list: Recipe[] = [];
+		store.subscribe((v) => (list = v))();
+		expect(list[0]).toMatchObject({ cook_together: false, cook_soon: true, cook_multiplier: 2 });
+		expect(fm["cook-together"]).toBe(false);
 	});
 });

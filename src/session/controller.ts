@@ -34,6 +34,9 @@ export class CookSessionController {
 				app,
 				settings.cookSoonProp,
 			);
+			// Marking alone doesn't change the list; rebuild it so their
+			// ingredients are actually on it, as the option says
+			await this.plugin.generateShoppingList();
 		}
 		try {
 			const session = await prepareCookSession(app, recipes, {

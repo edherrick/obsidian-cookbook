@@ -171,7 +171,7 @@
 				checked={cookSoon}
 				onchange={handleToggleCookSoon}
 			/>
-			Cook soon
+			Shopping list
 		</label>
 
 		{#if cookSoon}
@@ -188,7 +188,7 @@
 				checked={cookTogether}
 				onchange={handleToggleCookTogether}
 			/>
-			Cook together
+			Cook session
 		</label>
 	</div>
 

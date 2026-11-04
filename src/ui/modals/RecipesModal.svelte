@@ -231,7 +231,7 @@
 		</div>
 		<div class="quick-chips" role="group" aria-label="Quick filters">
 			<button class="quick-chip" aria-pressed={onlyCookSoon} onclick={() => (onlyCookSoon = !onlyCookSoon)}>
-				Cook soon{#if cookSoonCount > 0}&nbsp;<span class="chip-count">{cookSoonCount}</span>{/if}
+				Shopping list{#if cookSoonCount > 0}&nbsp;<span class="chip-count">{cookSoonCount}</span>{/if}
 			</button>
 			{#if tracksTried}
 				<button class="quick-chip" aria-pressed={onlyUntried} onclick={() => (onlyUntried = !onlyUntried)}>
@@ -272,7 +272,7 @@
 			<select class="dropdown" bind:value={sortMode} disabled={!ingredientsReady}>
 				<option value="name">Default</option>
 				<option value="overlap" disabled={cookTogetherPaths.length === 0}>
-					Overlap with cook-together set
+					Overlap with cook session recipes
 				</option>
 			</select>
 		</label>
