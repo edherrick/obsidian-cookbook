@@ -8,6 +8,7 @@
 		applyToggleCookSoon,
 		applyToggleCookTogether,
 		applySetMultiplier,
+		applySetCookSoon,
 	} from "../../recipes/repository";
 	import type { Recipe } from "../../recipes/repository";
 
@@ -94,6 +95,16 @@
 	async function handleGenerate() {
 		generating = true;
 		try {
+			// The checkbox sits beside this button too, so honour it here, not only
+			// when starting a session; the store updates synchronously before generating
+			if (alsoCookSoon && $cookTogetherRecipes.length > 0) {
+				applySetCookSoon(
+					stores.recipes,
+					$cookTogetherRecipes.map((r: Recipe) => r.path),
+					app,
+					cookSoonProp,
+				);
+			}
 			await generateShoppingList();
 			close();
 		} finally {
