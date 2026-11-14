@@ -179,7 +179,8 @@ export function applySetCookSoon(
 /**
  * Take every recipe off the shopping list (or, with `cook_together`, out of
  * the cook session), writing only the notes that change. Clearing the
- * shopping list also resets multipliers, so next week starts at ×1.
+ * shopping list also resets multipliers of recipes left on neither list, so
+ * next week starts at ×1.
  * Returns how many recipes were cleared.
  */
 export function applyClearFlag(
@@ -193,7 +194,9 @@ export function applyClearFlag(
 		list.map((r) => {
 			if (!r[field]) return r;
 			changed.push(r.path);
-			return { ...r, [field]: false, [prop]: false, ...(field === "cook_soon" ? { cook_multiplier: 1 } : {}) };
+			// The multiplier is shared by both lists, so reset it only once the recipe is on neither
+			const other = field === "cook_soon" ? r.cook_together : r.cook_soon;
+			return { ...r, [field]: false, [prop]: false, ...(other ? {} : { cook_multiplier: 1 }) };
 		}),
 	);
 	for (const path of changed) void flushFlag(path, false, app, prop);

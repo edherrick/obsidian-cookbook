@@ -174,7 +174,7 @@
 			Shopping list
 		</label>
 
-		{#if cookSoon}
+		{#if cookSoon || cookTogether}
 			<MultiplierControl
 				value={multiplier}
 				onDecrement={() => { multiplier = Math.max(1, multiplier - 1); onSetMultiplier?.(multiplier); }}

@@ -163,6 +163,13 @@
 							onchange={() => toggleCookTogether(recipe.path)}
 						/>
 						<span class="recipe-title">{(recipe as Recipe).title ?? (recipe as Recipe).path}</span>
+						<span class="mult-push">
+							<MultiplierControl
+								value={recipe.cook_multiplier ?? 1}
+								onDecrement={() => setMultiplier(recipe.path, Math.max(1, (recipe.cook_multiplier ?? 1) - 1))}
+								onIncrement={() => setMultiplier(recipe.path, (recipe.cook_multiplier ?? 1) + 1)}
+							/>
+						</span>
 					</li>
 				{/each}
 			</ul>

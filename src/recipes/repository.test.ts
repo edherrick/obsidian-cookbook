@@ -316,22 +316,28 @@ describe("technique tags", () => {
 });
 
 describe("applyClearFlag", () => {
-	it("clears the shopping list flag everywhere, resetting multipliers", () => {
+	it("clears the shopping list flag everywhere, resetting multipliers of recipes on neither list", () => {
 		const fmA: Record<string, unknown> = { tags: ["recipe"], "cook-soon": true };
 		const fmB: Record<string, unknown> = { tags: ["recipe"] };
+		const fmC: Record<string, unknown> = { tags: ["recipe"], "cook-soon": true };
 		const app = makeApp([
 			{ path: "a.md", frontmatter: fmA },
 			{ path: "b.md", frontmatter: fmB },
+			{ path: "c.md", frontmatter: fmC },
 		]);
 		const store = writable<Recipe[]>([
 			{ ...recipeFixture("a.md", { cook_soon: true, cook_multiplier: 3 }), cook_together: true },
 			recipeFixture("b.md"),
+			recipeFixture("c.md", { cook_soon: true, cook_multiplier: 2 }),
 		]);
-		expect(applyClearFlag(store, app, "cook_soon", "cook-soon")).toBe(1);
+		expect(applyClearFlag(store, app, "cook_soon", "cook-soon")).toBe(2);
 		let list: Recipe[] = [];
 		store.subscribe((v) => (list = v))();
-		expect(list[0]).toMatchObject({ cook_soon: false, cook_multiplier: 1, cook_together: true });
+		// Still in the cook session, so its multiplier is kept
+		expect(list[0]).toMatchObject({ cook_soon: false, cook_multiplier: 3, cook_together: true });
+		expect(list[2]).toMatchObject({ cook_soon: false, cook_multiplier: 1 });
 		expect(fmA["cook-soon"]).toBe(false);
+		expect(fmC["cook-soon"]).toBe(false);
 		// Untouched notes aren't rewritten
 		expect("cook-soon" in fmB).toBe(false);
 	});

@@ -122,6 +122,15 @@
 					<span class="chip-icon" use:obsidianIcon={"cooking-pot"} aria-hidden="true"></span>
 					Cook session
 				</button>
+				<!-- One shared multiplier: shown here only when the shopping chip isn't already showing it -->
+				{#if together && !cookSoon}
+					<MultiplierControl
+						compact
+						value={multiplier}
+						onDecrement={() => onSetMultiplier?.(recipe.path, Math.max(1, multiplier - 1))}
+						onIncrement={() => onSetMultiplier?.(recipe.path, multiplier + 1)}
+					/>
+				{/if}
 			</span>
 		</div>
 	</div>
