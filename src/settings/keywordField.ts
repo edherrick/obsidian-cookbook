@@ -319,6 +319,7 @@ function focusEnd(el: HTMLElement): void {
 /** Grow a textarea to show all its text. Measures nothing while it's hidden. */
 function fitHeight(el: HTMLTextAreaElement): void {
 	if (!el.isConnected || el.offsetParent === null) return;
-	el.setCssStyles({ height: "auto" });
-	el.setCssStyles({ height: `${el.scrollHeight}px` });
+	// Through a CSS variable the stylesheet reads, so no inline style is set
+	el.setCssProps({ "--cookbook-textarea-height": "auto" });
+	el.setCssProps({ "--cookbook-textarea-height": `${el.scrollHeight}px` });
 }

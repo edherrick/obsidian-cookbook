@@ -223,6 +223,8 @@
 	display: none;
 	width: 100%;
 	min-height: 2.2em;
+	/* Set by fitHeight() so the textarea grows to fit its text */
+	height: var(--cookbook-textarea-height, auto);
 	resize: none;
 	overflow: hidden;
 	line-height: 1.5;
