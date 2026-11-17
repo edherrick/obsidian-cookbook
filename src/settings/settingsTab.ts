@@ -15,6 +15,8 @@ import { storeLayoutItems } from "./storeLayouts";
 import { PathPickerModal } from "./pathPickerModal";
 import { renderIngredientNamesPanel } from "./ingredientNamesPanel";
 import type { IngredientNamesState } from "./ingredientNamesPanel";
+import { renderPrepWordsPanel } from "./prepWordsPanel";
+import type { PrepWordsState } from "./prepWordsPanel";
 
 /** Keystrokes shouldn't each cost a disk read + write. */
 const SAVE_DEBOUNCE_MS = 400;
@@ -114,6 +116,7 @@ export class CookbookSettingTab extends PluginSettingTab implements SettingsHost
 	plugin: CookbookPlugin;
 	private readonly saveDebounced: Debouncer<[], void>;
 	private readonly namesState: IngredientNamesState = { names: null };
+	private readonly prepWordsState: PrepWordsState = { phrases: null };
 
 	constructor(app: App, plugin: CookbookPlugin) {
 		super(app, plugin);
@@ -404,7 +407,20 @@ export class CookbookSettingTab extends PluginSettingTab implements SettingsHost
 								keywordsLabel: "Words that mean it",
 								countNoun: ["word", "words"],
 								reorderable: true,
+								searchPlaceholder: "Search techniques or their words",
 							}),
+							{
+								type: "group",
+								heading: "Prep words in your recipes",
+								items: [
+									{
+										name: "Find prep words no technique knows",
+										desc: "Add words your recipes use to a technique, or check recipes for tags to add or tidy.",
+										searchable: true,
+										render: (setting: Setting) => this.renderPrepWordsPanel(setting),
+									},
+								],
+							},
 						],
 					},
 				],
@@ -449,6 +465,12 @@ export class CookbookSettingTab extends PluginSettingTab implements SettingsHost
 		header?.remove();
 		if (labelId) setting.nameEl.id = labelId;
 		return () => field.destroy();
+	}
+
+	private renderPrepWordsPanel(setting: Setting): void {
+		setting.settingEl.addClass("cookbook-names-setting");
+		const host = setting.settingEl.createDiv({ cls: "cookbook-names-host" });
+		renderPrepWordsPanel(host, this.plugin, this.prepWordsState, () => this.refresh());
 	}
 
 	private renderNamesPanel(setting: Setting): void {

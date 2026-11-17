@@ -1,5 +1,6 @@
 import type { ParsedIngredient } from "../ingredients/parse";
 import { writtenPrep } from "../ingredients/parse";
+import { NOT_PREP_RE } from "../vocab/prepWords";
 import type { ShoppingItem } from "../types";
 import type { Vocabulary } from "../vocab/vocabulary";
 import { aggregateItems } from "../ingredients/aggregate";
@@ -47,13 +48,6 @@ export interface SessionOptions {
 }
 
 export const MY_NOTES_HEADING = "## My notes";
-
-/**
- * Prep notes that are about measuring or serving, not knife work. They are
- * left out of "Other prep", which is for prep the vocabulary doesn't know yet.
- */
-const NOT_PREP_RE =
-	/^(?:optional|to taste|plus\b|for\b|packed|divided|at room temperature|room temperature|if desired|as needed|warm|cold|about\b)/i;
 
 /** Everything from the "My notes" heading on, so a regenerate keeps it. */
 export function keptNotes(existing: string | undefined): string {

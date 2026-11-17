@@ -30,6 +30,8 @@ export interface CookbookSettings {
 	techniques: Technique[];
 	/** Categories left out of overlap scoring: their contents are in most recipes. */
 	overlapIgnoreCategories: string[];
+	/** Prep-note phrases the prep words panel no longer lists. */
+	ignoredPrepPhrases: string[];
 }
 
 export { DEFAULT_SETTINGS, STARTER_KEYWORD_LISTS };
@@ -55,6 +57,7 @@ export function cloneDefaultSettings(): CookbookSettings {
 		})),
 		techniques: DEFAULT_SETTINGS.techniques.map((t) => ({ ...t, keywords: [...t.keywords] })),
 		overlapIgnoreCategories: [...DEFAULT_SETTINGS.overlapIgnoreCategories],
+		ignoredPrepPhrases: [...DEFAULT_SETTINGS.ignoredPrepPhrases],
 	};
 }
 

@@ -271,6 +271,7 @@ export const DEFAULT_SETTINGS: CookbookSettings = {
 	],
 
 	overlapIgnoreCategories: ["Baking & Spices", "Pantry"],
+	ignoredPrepPhrases: [],
 
 	// Categories and dietary groups are names; the ingredients say which apply
 	shoppingCategories: STARTER_KEYWORD_LISTS.shoppingCategories.map(({ name }) => ({ name })),

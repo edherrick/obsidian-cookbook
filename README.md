@@ -18,7 +18,7 @@ An [Obsidian](https://obsidian.md) plugin to browse your recipe notes, filter th
 - **Store layouts** — give each shop numbered aisles (and move single ingredients where that shop keeps them); the list sorts itself into that shop's order
 - **Drag to reorder** — rearrange shopping list categories by dragging
 - **Recipe detail** — click any recipe card to read the full note rendered inside Obsidian
-- **Technique tags** — tag prep on ingredient lines (`#prep/dice`, `#prep/mince`); a check command finds typos and untagged prep
+- **Technique tags** — tag prep on ingredient lines (`#prep/dice`, `#prep/mince`); a check command finds typos, untagged prep and notes that repeat their tag
 - **Ingredient list** — one list where each ingredient has a category, dietary groups, other names and a staple flag; a names panel adds the ingredients your recipes use and suggests duplicates to merge
 - **Cooks well with** — the recipe detail lists the recipes that share the most distinctive ingredients, and the browser can sort by overlap with the recipes marked for your cook session
 - **Cooking sessions** — mark recipes for the **Cook session** and generate one note with the combined equipment, a prep list with one line per ingredient and all its steps, every recipe's steps in a cook order you can arrange by hand, and store/reheat instructions
@@ -111,7 +111,9 @@ Tag the prep a line needs with `#prep/<technique>`. Tags can go anywhere on the 
 - [ ] 1 medium shallot | #prep/mince                          →  medium shallot    + note "mince"
 ```
 
-Techniques are a fixed list in settings (peel, halve, seed, quarter, dice, chop, mince, slice, shred, grate, zest, juice, rinse by default), in the order prep is done. Each one also lists the words that mean it, so an untagged `4 garlic cloves, minced` still counts as mince. Run **Check recipe technique tags** to find unknown tags (usually typos) and untagged prep; untagged lines can be fixed with one click.
+Techniques are a fixed list in settings (peel, halve, seed, quarter, dice, chop, mince, slice, shred, grate, zest, juice, rinse by default), in the order prep is done. Each one also lists the words that mean it, so an untagged `4 garlic cloves, minced` still counts as mince. Run **Check recipe technique tags** to find unknown tags (usually typos), untagged prep, and notes that only repeat their own tag (`#prep/dice cubed`, `#prep/chop well chopped`). Untagged lines get their tags, and repeating notes get tidied, with one click each; you see the line before and after first.
+
+Under **Settings → Prep techniques**, search the technique list by name or word. **Prep words in your recipes** scans your notes for prep words no technique knows, like *smashed* or *trimmed*. Add one to a technique, start a new technique from it, or ignore it if it isn't prep (*finely*, *gluten-free if needed*).
 
 Because they are ordinary Obsidian tags, selecting `#prep/dice` searches every recipe that dices something, and the browser offers a `technique` filter.
 
@@ -244,7 +246,7 @@ Add, rename or remove dietary groups under **Ingredients → Dietary groups**, a
 | **Open shopping list** | Opens the shopping list sidebar panel |
 | **Start cooking session** | Writes today's session note for the recipes marked for the cook session and opens the arrange window |
 | **Arrange cook order** | Rearranges the steps of the open session note |
-| **Check recipe technique tags** | Lists unknown technique tags and untagged prep |
+| **Check recipe technique tags** | Lists unknown technique tags, untagged prep and notes that repeat their tag |
 
 ## Settings
 

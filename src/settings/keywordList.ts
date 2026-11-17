@@ -19,6 +19,8 @@ export interface KeywordListOptions {
 	/** What the keywords are called: field label, then singular and plural for the count. */
 	keywordsLabel?: string;
 	countNoun?: [string, string];
+	/** A search box over the rows, matching a row's name or any of its keywords. */
+	searchPlaceholder?: string;
 }
 
 /**
@@ -38,6 +40,21 @@ export function keywordList(host: SettingsHost, opts: KeywordListOptions): Setti
 	return {
 		type: "list",
 		emptyState: opts.emptyState,
+		...(opts.searchPlaceholder
+			? {
+					search: {
+						placeholder: opts.searchPlaceholder,
+						match: (def: { name: string; desc?: unknown }, query: string) => {
+							const q = query.trim().toLowerCase();
+							return (
+								!q ||
+								def.name.toLowerCase().includes(q) ||
+								(typeof def.desc === "string" && def.desc.toLowerCase().includes(q))
+							);
+						},
+					},
+				}
+			: {}),
 		extraButtons: [
 			(b) =>
 				b

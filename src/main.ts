@@ -23,6 +23,8 @@ import { Vocabulary } from "./vocab/vocabulary";
 import { VocabularyCheckModal } from "./vocab/checkModal";
 import { indexIngredientNames } from "./vocab/names";
 import type { IngredientName } from "./vocab/names";
+import { unknownPrepPhrases } from "./vocab/prepWords";
+import type { PrepPhrase } from "./vocab/prepWords";
 
 /** Frontmatter edits arrive in bursts; rescanning once per burst is enough. */
 const RECIPE_REFRESH_DEBOUNCE_MS = 500;
@@ -153,11 +155,7 @@ export default class CookbookPlugin extends Plugin {
 		this.addCommand({
 			id: "check-recipe-vocabulary",
 			name: "Check recipe technique tags",
-			callback: () =>
-				new VocabularyCheckModal(this.app, {
-					recipes: () => get(this.recipeStores.recipes),
-					vocab: () => this.vocabulary,
-				}).open(),
+			callback: () => this.openTechniqueCheck(),
 		});
 	}
 
@@ -203,11 +201,11 @@ export default class CookbookPlugin extends Plugin {
 		}).open();
 	}
 
-	/** Every distinct ingredient in the recipe library, for the aliases panel. */
-	async ingredientNames(): Promise<IngredientName[]> {
+	/** Every recipe's title and parsed ingredients, freshly read. */
+	private async recipeIngredients(): Promise<[string, ParsedIngredient[]][]> {
 		await this.refreshRecipes();
 		const recipes = get(this.recipeStores.recipes);
-		const byRecipe = await Promise.all(
+		return Promise.all(
 			recipes.map(
 				async (r): Promise<[string, ParsedIngredient[]]> => [
 					r.title,
@@ -215,7 +213,24 @@ export default class CookbookPlugin extends Plugin {
 				],
 			),
 		);
-		return indexIngredientNames(byRecipe, this.vocabulary);
+	}
+
+	/** Every distinct ingredient in the recipe library, for the aliases panel. */
+	async ingredientNames(): Promise<IngredientName[]> {
+		return indexIngredientNames(await this.recipeIngredients(), this.vocabulary);
+	}
+
+	/** Prep-note phrases no technique knows, for the prep words panel. */
+	async prepPhrases(): Promise<PrepPhrase[]> {
+		return unknownPrepPhrases(await this.recipeIngredients(), this.vocabulary);
+	}
+
+	/** Every recipe line whose technique tags need attention. */
+	openTechniqueCheck(): void {
+		new VocabularyCheckModal(this.app, {
+			recipes: () => get(this.recipeStores.recipes),
+			vocab: () => this.vocabulary,
+		}).open();
 	}
 
 	unitPrefs(): DisplayUnitPrefs {
