@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { onMount, onDestroy } from "svelte";
-	import { MarkdownRenderer, Component } from "obsidian";
+	import { MarkdownRenderer, Component, Keymap } from "obsidian";
+	import { obsidianIcon } from "../../utils/obsidianIcon";
+	import { SvelteModalWrapper } from "../../utils/SvelteModalWrapper";
 	import type { App } from "obsidian";
 	import type { Recipe } from "../../recipes/repository";
 	import MultiplierControl from "../components/MultiplierControl.svelte";
@@ -124,11 +126,14 @@
 		return path.split("/").pop()!.replace(/\.md$/, "");
 	}
 
-	function openRecipe(path: string) {
+	/** Open a recipe note. Cmd/Ctrl-click opens it in a new tab. */
+	function openRecipe(path: string, e?: MouseEvent) {
 		const file = app.vault.getFileByPath(path);
 		if (!file) return;
-		void app.workspace.getLeaf(false).openFile(file);
+		void app.workspace.getLeaf(e ? Keymap.isModEvent(e) : false).openFile(file);
+		// The Cookbook windows sit over the note, so close them all, not just this one
 		close();
+		SvelteModalWrapper.closeAll();
 	}
 
 
@@ -190,6 +195,15 @@
 			/>
 			Cook session
 		</label>
+
+		<button
+			class="open-btn"
+			onclick={(e) => openRecipe(recipe.path, e)}
+			title="Open the recipe note (Cmd/Ctrl-click for a new tab)"
+		>
+			<span use:obsidianIcon={"square-arrow-out-up-right"} class="btn-icon" aria-hidden="true"></span>
+			Open note
+		</button>
 	</div>
 
 	{#if overlap.length > 0}
@@ -198,7 +212,7 @@
 			<ul>
 				{#each overlap as match (match.path)}
 					<li>
-						<button class="overlap-link" onclick={() => openRecipe(match.path)}>
+						<button class="overlap-link" onclick={(e) => openRecipe(match.path, e)}>
 							{titleOf(match.path)}
 						</button>
 						<span class="overlap-shared">
@@ -304,6 +318,19 @@
 		gap: 6px;
 		font-size: 0.9em;
 		cursor: pointer;
+	}
+
+	.open-btn {
+		display: flex;
+		align-items: center;
+		gap: 5px;
+		font-size: 0.85em;
+		margin-left: auto;
+	}
+
+	.btn-icon {
+		display: inline-flex;
+		--icon-size: 14px;
 	}
 
 	.cooks-well-with {
