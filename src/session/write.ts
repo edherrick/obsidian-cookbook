@@ -60,6 +60,8 @@ export async function toSessionRecipe(
 	return {
 		path: recipe.path,
 		title: recipe.title,
+		// Obsidian's own property; "alias" is its older spelling
+		aliases: list(recipe.aliases ?? recipe.alias),
 		content: await app.vault.cachedRead(file),
 		ingredients: await cache.get(app, recipe),
 		multiplier: recipe.cook_multiplier ?? 1,

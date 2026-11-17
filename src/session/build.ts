@@ -16,6 +16,8 @@ export { cookOrder, extractSection, extractSteps } from "./steps";
 export interface SessionRecipe {
 	path: string;
 	title: string;
+	/** The note's `aliases` property; the first one names it on the prep list. */
+	aliases?: string[];
 	/** The note's raw markdown, frontmatter included. */
 	content: string;
 	ingredients: ParsedIngredient[];
@@ -51,7 +53,7 @@ export const MY_NOTES_HEADING = "## My notes";
  * left out of "Other prep", which is for prep the vocabulary doesn't know yet.
  */
 const NOT_PREP_RE =
-	/^(?:optional|to taste|plus\b|for serving|for garnish|for topping|packed|divided|at room temperature|room temperature|if desired|as needed|warm|cold|about\b)/i;
+	/^(?:optional|to taste|plus\b|for\b|packed|divided|at room temperature|room temperature|if desired|as needed|warm|cold|about\b)/i;
 
 /** Everything from the "My notes" heading on, so a regenerate keeps it. */
 export function keptNotes(existing: string | undefined): string {
@@ -79,6 +81,8 @@ interface PrepEntry {
 	item: ShoppingItem;
 	recipe: SessionRecipe;
 	detail?: string;
+	/** Every technique this ingredient line calls for, in prep order. */
+	techniques: string[];
 }
 
 function toItem(ing: ParsedIngredient, recipe: SessionRecipe): ShoppingItem {
@@ -108,101 +112,106 @@ function amount(item: Pick<ShoppingItem, "quantity" | "unit">): string {
 	return item.unit ? `${formatQty(item.quantity)} ${item.unit}` : formatQty(item.quantity);
 }
 
+/**
+ * What a recipe is called beside its dot on the prep list: its first alias,
+ * so a long title can have a short name the note's owner picks, else the title.
+ */
+export function prepName(r: Pick<SessionRecipe, "title" | "aliases">): string {
+	return r.aliases?.map((a) => a.trim()).find((a) => a.length > 0) ?? r.title;
+}
+
+/** Prep notes with the measuring and serving asides taken out, for comparing. */
+function prepKey(detail: string | undefined): string {
+	if (!detail) return "";
+	return tidy(detail)
+		.split(/\s*[,;]\s*/)
+		.filter((part) => part && !NOT_PREP_RE.test(part))
+		.join(", ")
+		.toLowerCase();
+}
+
 function prepLine(entries: PrepEntry[], opts: SessionOptions, dots: Map<string, string>): string {
 	const keyOf = (t: string) => opts.vocab.ingredientKey(t);
-	const totals = aggregateItems(
-		entries.map((e) => e.item),
-		opts.unitPrefs,
-		keyOf,
-	)
-		.map(amount)
-		.filter(Boolean);
-	const details = [
-		...new Set(entries.map((e) => (e.detail ? tidy(e.detail) : "")).filter((d) => d.length > 0)),
-	];
-	// A recipe that uses the ingredient in two steps is still one source
-	const byRecipe = new Map<string, PrepEntry[]>();
-	for (const e of entries) byRecipe.set(e.recipe.path, [...(byRecipe.get(e.recipe.path) ?? []), e]);
-	// In key order, so the dots read the same way on every line
-	const rank = [...dots.keys()];
-	const groups = [...byRecipe.values()].sort(
-		(x, y) => rank.indexOf(x[0]!.recipe.path) - rank.indexOf(y[0]!.recipe.path),
-	);
-	const sources = groups.map((group) => {
-		const a = aggregateItems(
-			group.map((e) => e.item),
+	const sum = (es: PrepEntry[]) =>
+		aggregateItems(
+			es.map((e) => e.item),
 			opts.unitPrefs,
 			keyOf,
 		)
 			.map(amount)
 			.filter(Boolean)
 			.join(" + ");
-		return { dot: dots.get(group[0]!.recipe.path) ?? "", amount: a };
+	const details = [
+		...new Set(entries.map((e) => (e.detail ? tidy(e.detail) : "")).filter((d) => d.length > 0)),
+	];
+	// A recipe that uses the ingredient in two steps is still one source
+	const byRecipe = new Map<string, PrepEntry[]>();
+	for (const e of entries) byRecipe.set(e.recipe.path, [...(byRecipe.get(e.recipe.path) ?? []), e]);
+	// In key order, so the recipes read the same way on every line
+	const rank = [...dots.keys()];
+	const groups = [...byRecipe.values()].sort(
+		(x, y) => rank.indexOf(x[0]!.recipe.path) - rank.indexOf(y[0]!.recipe.path),
+	);
+	const sources = groups.map((group) => {
+		const r = group[0]!.recipe;
+		return { label: `${dots.get(r.path) ?? ""} ${prepName(r)}`.trim(), amount: sum(group) };
 	});
 
 	const name = tidy(entries[0]!.item.text) || entries[0]!.item.text;
-	const head = [`**${name}**`, totals.join(" + "), details.join("; ")]
-		.filter(Boolean)
-		.join(" · ");
+	const steps = entries[0]!.techniques.join(", ");
+	const head = [`**${name}**`, sum(entries), steps, details.join("; ")].filter(Boolean).join(" · ");
 	// One source needs no amount when it is the whole total
 	const tail =
 		sources.length > 1
-			? sources.map((x) => (x.amount ? `${x.dot} ${x.amount}` : x.dot)).join(", ")
-			: sources[0]!.dot;
+			? sources.map((x) => (x.amount ? `${x.label} ${x.amount}` : x.label)).join(", ")
+			: sources[0]!.label;
 	return `- [ ] ${head} — ${tail}`;
 }
 
-function groupByIngredient(entries: PrepEntry[], vocab: Vocabulary): PrepEntry[][] {
-	const groups = new Map<string, PrepEntry[]>();
-	for (const e of entries) {
-		const key = vocab.ingredientKey(e.item.text);
-		const list = groups.get(key) ?? [];
-		list.push(e);
-		groups.set(key, list);
-	}
-	return [...groups.values()];
-}
-
 /**
- * The combined prep list: one section per technique, in prep order, so all
- * the peeling happens before all the dicing. An ingredient that is peeled and
- * diced appears under both — those are two passes over the board.
+ * The combined prep list: one line per ingredient and the way it's prepped,
+ * with every step in order ("peel, dice"). Recipes that prep an ingredient
+ * the same way share a line; different prep gets a line of its own, kept
+ * beside the other lines for that ingredient. Ingredients run in the order
+ * of their first step, so rinsing and peeling come first, and prep the
+ * vocabulary doesn't know comes last.
  */
 export function buildPrepList(recipes: SessionRecipe[], opts: SessionOptions): string {
 	const dots = recipeDots(recipes);
-	const byTechnique = new Map<string, PrepEntry[]>();
-	const other: PrepEntry[] = [];
+	const order = opts.vocab.techniqueNames();
+	const lines = new Map<string, PrepEntry[]>();
 
 	for (const recipe of recipes) {
 		for (const ing of recipe.ingredients) {
 			const { techniques } = opts.vocab.techniquesFor(ing);
 			const detail = writtenPrep(ing);
-			const entry = { item: toItem(ing, recipe), recipe, detail };
-			if (techniques.length === 0) {
-				if (detail && !NOT_PREP_RE.test(detail)) other.push(entry);
-				continue;
-			}
-			for (const t of techniques) {
-				const list = byTechnique.get(t) ?? [];
-				list.push(entry);
-				byTechnique.set(t, list);
-			}
+			if (techniques.length === 0 && (!detail || NOT_PREP_RE.test(detail))) continue;
+			const entry = { item: toItem(ing, recipe), recipe, detail, techniques };
+			// Notes on prep the vocabulary doesn't know are too loose to tell batches
+			// apart ("half of a packet"), so those merge on the ingredient alone
+			const how = techniques.length > 0 ? [techniques.join(","), prepKey(detail)] : ["", ""];
+			const key = [opts.vocab.ingredientKey(ing.text), ...how].join("|");
+			lines.set(key, [...(lines.get(key) ?? []), entry]);
 		}
 	}
+	if (lines.size === 0) return "_Nothing to prep ahead._";
 
-	const sections: string[] = [];
-	for (const t of opts.vocab.techniqueNames()) {
-		const entries = byTechnique.get(t);
-		if (!entries) continue;
-		const title = t.charAt(0).toUpperCase() + t.slice(1);
-		const lines = groupByIngredient(entries, opts.vocab).map((g) => prepLine(g, opts, dots));
-		sections.push(`### ${title} ${opts.vocab.tagFor(t)}\n${lines.join("\n")}`);
+	// Where a line's first step falls in prep order; unknown prep goes last
+	const firstStep = (es: PrepEntry[]) => {
+		const t = es[0]!.techniques[0];
+		return t === undefined ? order.length : order.indexOf(t);
+	};
+	const byIngredient = new Map<string, PrepEntry[][]>();
+	for (const es of lines.values()) {
+		const key = opts.vocab.ingredientKey(es[0]!.item.text);
+		byIngredient.set(key, [...(byIngredient.get(key) ?? []), es]);
 	}
-	if (other.length > 0) {
-		const lines = groupByIngredient(other, opts.vocab).map((g) => prepLine(g, opts, dots));
-		sections.push(`### Other prep\n${lines.join("\n")}`);
-	}
-	return sections.length > 0 ? sections.join("\n\n") : "_Nothing to prep ahead._";
+	const ingredients = [...byIngredient.values()].map((ls) => ls.sort((a, b) => firstStep(a) - firstStep(b)));
+	ingredients.sort((a, b) => firstStep(a[0]!) - firstStep(b[0]!));
+	return ingredients
+		.flat()
+		.map((es) => prepLine(es, opts, dots))
+		.join("\n");
 }
 
 // ─── Cook order ─────────────────────────────────────────────────────────────

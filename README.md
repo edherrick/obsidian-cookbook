@@ -21,7 +21,7 @@ An [Obsidian](https://obsidian.md) plugin to browse your recipe notes, filter th
 - **Technique tags** — tag prep on ingredient lines (`#prep/dice`, `#prep/mince`); a check command finds typos and untagged prep
 - **Ingredient list** — one list where each ingredient has a category, dietary groups, other names and a staple flag; a names panel adds the ingredients your recipes use and suggests duplicates to merge
 - **Cooks well with** — the recipe detail lists the recipes that share the most distinctive ingredients, and the browser can sort by overlap with the recipes marked for your cook session
-- **Cooking sessions** — mark recipes for the **Cook session** and generate one note with the combined equipment, a prep list grouped by technique, every recipe's steps in a cook order you can arrange by hand, and store/reheat instructions
+- **Cooking sessions** — mark recipes for the **Cook session** and generate one note with the combined equipment, a prep list with one line per ingredient and all its steps, every recipe's steps in a cook order you can arrange by hand, and store/reheat instructions
 
 ## How It Works
 
@@ -140,7 +140,7 @@ Select **Cook session** on recipes you want to batch-cook (saved as `cook-togeth
 
 - **Recipes** — a colored dot per recipe, with timings and how long each keeps
 - **Equipment** — the combined `equipment` lists
-- **Prep list** — one section per technique in prep order, each ingredient merged across recipes, with each recipe's dot and amount, so all the peeling happens before all the dicing
+- **Prep list** — one line per ingredient with every step in order ("peel, dice"), merged across recipes that prep it the same way, with each recipe's dot, name and amount (a recipe's first `aliases` entry, if it has one, stands in for a long title); an ingredient prepped two ways gets two lines side by side
 - **Cook order** — numbered steps, with *meanwhile* steps under the step they run alongside
 - **Store and reheat** — from each recipe's `## Store it` and `## Reheat it` sections
 - **My notes** — yours; kept when the session is regenerated

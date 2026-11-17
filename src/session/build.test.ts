@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
 	buildPrepList,
+	prepName,
 	buildSessionNote,
 	cookOrder,
 	extractSection,
@@ -106,33 +107,46 @@ describe("extractSection", () => {
 
 describe("buildPrepList", () => {
 	const list = buildPrepList([burritos, onePan, soup], opts);
+	const lines = list.split("\n");
+	const lineFor = (name: string) => lines.filter((l) => l.includes(`**${name}**`));
 
-	it("groups by technique in prep order", () => {
-		const order = ["### Peel", "### Quarter", "### Dice", "### Mince"].map((h) => list.indexOf(h));
-		expect(order.every((i) => i >= 0)).toBe(true);
-		expect([...order].sort((a, b) => a - b)).toEqual(order);
+	it("has no technique headings", () => {
+		expect(list).not.toContain("###");
 	});
 
-	it("tags each technique heading", () => {
-		expect(list).toContain("### Dice #prep/dice");
+	it("puts every step for an ingredient on one line, in prep order", () => {
+		const squash = lineFor("butternut squash");
+		expect(squash).toHaveLength(1);
+		expect(squash[0]).toContain("· peel, dice ·");
 	});
 
-	it("merges one ingredient across recipes and totals it", () => {
-		const dice = list.slice(list.indexOf("### Dice"), list.indexOf("### Mince"));
-		expect(dice).toContain("**butternut squash** · 4 cups · small");
+	it("merges an ingredient prepped the same way across recipes and totals it", () => {
 		// Cook order is Soup, Burritos, One-Pan, so Burritos is orange, One-Pan yellow
-		expect(dice).toContain("— 🟠 2 cups, 🟡 2 cups");
+		expect(lineFor("butternut squash")[0]).toContain("**butternut squash** · 4 cups · peel, dice · small");
+		expect(lineFor("butternut squash")[0]).toContain("— 🟠 Burritos 2 cups, 🟡 One-Pan 2 cups");
+	});
+
+	it("gives different prep its own line, beside the ingredient's other lines", () => {
+		const garlic = lines.map((l, i) => [l, i] as const).filter(([l]) => l.includes("**garlic**"));
+		expect(garlic.map(([l]) => l)).toEqual([
+			"- [ ] **garlic** · 5 cloves · peel — 🔴 Soup",
+			"- [ ] **garlic** · 3 cloves · mince · minced — 🟡 One-Pan",
+		]);
+		expect(garlic[1]![1] - garlic[0]![1]).toBe(1);
+	});
+
+	it("runs ingredients in the order of their first step, unknown prep last", () => {
+		const at = (name: string) => lines.findIndex((l) => l.includes(`**${name}**`));
+		expect(at("butternut squash")).toBeLessThan(at("medium shallot"));
+		expect(lines[lines.length - 1]).toContain("**bread**");
 	});
 
 	it("reads untagged prep words too", () => {
-		const mince = list.slice(list.indexOf("### Mince"));
-		expect(mince).toContain("**garlic**");
-		expect(mince).toContain("**medium shallot**");
+		expect(lineFor("medium shallot").some((l) => l.includes("· mince"))).toBe(true);
 	});
 
 	it("keeps prep the vocabulary doesn't know, and skips non-prep notes", () => {
-		expect(list).toContain("### Other prep");
-		expect(list).toContain("**bread**");
+		expect(list).toContain("**bread** · 1 cup · toasted — 🔴 Soup");
 		expect(list).not.toContain("curly kale");
 	});
 
@@ -142,14 +156,27 @@ describe("buildPrepList", () => {
 			`- [ ] 1 tsp fresh ginger | #prep/mince\n\nRice.\n\n---\n- [ ] 1 tsp fresh ginger | #prep/mince\n\nSauce.\n`,
 		);
 		const mince = buildPrepList([skillet], opts);
-		expect(mince).toContain("**fresh ginger** · 2 tsp — 🔴");
+		expect(mince).toContain("**fresh ginger** · 2 tsp · mince — 🔴 Skillet");
 		const both = buildPrepList([skillet, { ...skillet, path: "Other.md", title: "Other" }], opts);
-		expect(both).toContain("**fresh ginger** · 4 tsp — 🔴 2 tsp, 🟠 2 tsp");
+		expect(both).toContain("**fresh ginger** · 4 tsp · mince — 🔴 Other 2 tsp, 🟠 Skillet 2 tsp");
 	});
 
 	it("scales by the recipe's multiplier", () => {
 		const doubled = buildPrepList([{ ...burritos, multiplier: 2 }], opts);
 		expect(doubled).toContain("4 cups");
+	});
+});
+
+describe("prepName", () => {
+	it("uses the first alias, else the full title", () => {
+		expect(prepName({ title: "Turkey and Black Bean Taco Skillet" })).toBe("Turkey and Black Bean Taco Skillet");
+		expect(prepName({ title: "Turkey and Black Bean Taco Skillet", aliases: ["Taco skillet", "Tacos"] })).toBe("Taco skillet");
+		expect(prepName({ title: "Soup", aliases: ["  "] })).toBe("Soup");
+	});
+
+	it("names the recipe by its alias on the prep list", () => {
+		const list = buildPrepList([{ ...soup, aliases: ["Squash soup"] }], opts);
+		expect(list).toContain("— 🔴 Squash soup");
 	});
 });
 
