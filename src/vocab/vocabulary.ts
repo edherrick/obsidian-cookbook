@@ -96,6 +96,12 @@ export class Vocabulary {
 		return { techniques: this.matchWords(parsed.prep ?? ""), unknown: [], tagged: false };
 	}
 
+	/** A technique's name and its keywords, e.g. ["chop", "chopped"]. */
+	wordsFor(technique: string): string[] {
+		const t = this.techniques.find((x) => x.name.toLowerCase() === technique.toLowerCase());
+		return t ? [t.name, ...t.keywords] : [technique];
+	}
+
 	/** Techniques whose name or keywords occur in free text. */
 	matchWords(text: string): string[] {
 		if (!text.trim()) return [];

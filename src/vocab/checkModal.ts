@@ -11,9 +11,10 @@ interface CheckSources {
 }
 
 /**
- * Lists technique-tag problems across all recipes: unknown tags, and prep
- * words that name a technique without tagging it. Untagged lines can be fixed
- * in place; everything else opens the recipe at the line.
+ * Lists technique-tag problems across all recipes: unknown tags, prep words
+ * that name a technique without tagging it, and notes that only repeat a
+ * line's own tag ("#prep/dice cubed"). The last two can be fixed in place;
+ * everything else opens the recipe at the line.
  */
 export class VocabularyCheckModal extends Modal {
 	constructor(
@@ -48,7 +49,7 @@ export class VocabularyCheckModal extends Modal {
 		}
 
 		if (results.length === 0) {
-			contentEl.createEl("p", { text: "Every technique is tagged with a known tag." });
+			contentEl.createEl("p", { text: "Every technique is tagged with a known tag, and no note repeats its tag." });
 			return;
 		}
 
@@ -74,13 +75,13 @@ export class VocabularyCheckModal extends Modal {
 		const body = row.createDiv({ cls: "cookbook-vocab-body" });
 		body.createEl("code", { text: issue.text.trim() });
 		const tags = issue.techniques.map((t) => vocab.tagFor(t)).join(" ");
-		body.createDiv({
-			cls: "cookbook-vocab-message",
-			text:
-				issue.kind === "unknown-tag"
-					? `Unknown technique: ${tags}`
-					: `Untagged. Suggested: ${tags}`,
-		});
+		const message = {
+			"unknown-tag": `Unknown technique: ${tags}`,
+			untagged: `Untagged. Suggested: ${tags}`,
+			"restates-tag": `The note repeats ${tags}. Tidied:`,
+		}[issue.kind];
+		body.createDiv({ cls: "cookbook-vocab-message", text: message });
+		if (issue.fixed !== undefined) body.createEl("code", { text: issue.fixed.trim() });
 
 		const actions = row.createDiv({ cls: "cookbook-vocab-actions" });
 		actions.createEl("button", { text: "Open" }).addEventListener("click", () => {
@@ -90,11 +91,18 @@ export class VocabularyCheckModal extends Modal {
 				.then(() => this.close());
 		});
 
-		if (issue.kind === "untagged") {
-			const fix = actions.createEl("button", { text: "Add tags", cls: "mod-cta" });
+		const fixed =
+			issue.kind === "untagged"
+				? withTechniqueTags(issue.text, issue.techniques, vocab)
+				: issue.kind === "restates-tag"
+					? issue.fixed
+					: undefined;
+		if (fixed !== undefined) {
+			const label = issue.kind === "untagged" ? "Add tags" : "Tidy note";
+			const fix = actions.createEl("button", { text: label, cls: "mod-cta" });
 			fix.addEventListener("click", () => {
 				fix.disabled = true;
-				void this.applyFix(file, issue, vocab).then((ok) => {
+				void this.applyFix(file, issue, fixed).then((ok) => {
 					if (ok) row.addClass("is-fixed");
 					else fix.disabled = false;
 				});
@@ -103,12 +111,12 @@ export class VocabularyCheckModal extends Modal {
 	}
 
 	/** Rewrite one line, but only if it still reads as it did when checked. */
-	private async applyFix(file: TFile, issue: VocabularyIssue, vocab: Vocabulary): Promise<boolean> {
+	private async applyFix(file: TFile, issue: VocabularyIssue, fixed: string): Promise<boolean> {
 		let applied = false;
 		await this.app.vault.process(file, (content) => {
 			const lines = content.split("\n");
 			if (lines[issue.line] !== issue.text) return content;
-			lines[issue.line] = withTechniqueTags(issue.text, issue.techniques, vocab);
+			lines[issue.line] = fixed;
 			applied = true;
 			return lines.join("\n");
 		});

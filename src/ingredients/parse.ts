@@ -40,7 +40,7 @@ const PREP_TAIL_RE =
 	/^(?:or\s+)?(?:finely|roughly|coarsely|thinly|thickly|freshly|well|lightly|very)?\s*(?:chopped|diced|minced|sliced|divided|rinsed|drained|softened|melted|grated|shredded|crushed|peeled|halved|quartered|cubed|julienned|trimmed|beaten|cut|torn|seeded|stemmed|zested|juiced|crumbled|mashed|pitted|deveined|scrubbed|washed|warmed|cooled|separated|smashed|sifted|toasted|roasted|browned|thawed|shaved|pressed|chilled|casings|plus|optional|to taste|for serving|for garnish|at room temperature|room temperature|packed|if desired|as needed)\b/i;
 
 /** The first `|` that is not the alias separator inside a `[[wikilink|alias]]`. */
-function separatorIndex(raw: string): number {
+export function separatorIndex(raw: string): number {
 	let depth = 0;
 	for (let i = 0; i < raw.length; i++) {
 		if (raw.startsWith("[[", i)) {
