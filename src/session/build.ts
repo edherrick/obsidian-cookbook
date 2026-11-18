@@ -1,6 +1,6 @@
 import type { ParsedIngredient } from "../ingredients/parse";
 import { writtenPrep } from "../ingredients/parse";
-import { NOT_PREP_RE } from "../vocab/prepWords";
+import { NOT_PREP_RE, isPrepNote } from "../vocab/prepWords";
 import type { ShoppingItem } from "../types";
 import type { Vocabulary } from "../vocab/vocabulary";
 import { aggregateItems } from "../ingredients/aggregate";
@@ -93,12 +93,18 @@ function toItem(ing: ParsedIngredient, recipe: SessionRecipe): ShoppingItem {
 	};
 }
 
-/** Asides like "(about half a large squash)" are for the shop, not the board. */
+/**
+ * Asides like "(about half a large squash)" are for the shop, not the board.
+ * Links stay whole, so a linked ingredient ("[[House sausage]]") still opens.
+ */
 function tidy(s: string): string {
-	return stripParentheticals(s)
+	const links: string[] = [];
+	const held = s.replace(/\[\[[^\]]*\]\]/g, (link) => `⟦${links.push(link) - 1}⟧`);
+	return stripParentheticals(held)
 		.replace(/\s+([,;])/g, "$1")
 		.replace(/\s+/g, " ")
-		.replace(/^[\s,;]+|[\s,;]+$/g, "");
+		.replace(/^[\s,;]+|[\s,;]+$/g, "")
+		.replace(/⟦(\d+)⟧/g, (_m, i: string) => links[Number(i)] ?? "");
 }
 
 function amount(item: Pick<ShoppingItem, "quantity" | "unit">): string {
@@ -179,7 +185,8 @@ export function buildPrepList(recipes: SessionRecipe[], opts: SessionOptions): s
 		for (const ing of recipe.ingredients) {
 			const { techniques } = opts.vocab.techniquesFor(ing);
 			const detail = writtenPrep(ing);
-			if (techniques.length === 0 && (!detail || NOT_PREP_RE.test(detail))) continue;
+			// Untagged lines count only if their note asks for prep nobody marked as not prep
+			if (techniques.length === 0 && !isPrepNote(detail, opts.vocab)) continue;
 			const entry = { item: toItem(ing, recipe), recipe, detail, techniques };
 			// Notes on prep the vocabulary doesn't know are too loose to tell batches
 			// apart ("half of a packet"), so those merge on the ingredient alone

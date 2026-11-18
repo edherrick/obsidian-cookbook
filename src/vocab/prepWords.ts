@@ -10,6 +10,25 @@ import type { Vocabulary } from "./vocabulary";
 export const NOT_PREP_RE =
 	/^(?:optional|to taste|plus\b|for\b|packed|divided|at room temperature|room temperature|if desired|as needed|warm|cold|about\b)/i;
 
+/**
+ * A prep note's pieces, split at commas, semicolons and "and", lower-cased,
+ * without asides, measurements or serving notes.
+ */
+export function prepPieces(note: string): string[] {
+	return stripParentheticals(note)
+		.split(/\s*(?:[,;]|\band\b)\s*/i)
+		.map((raw) => raw.trim().toLowerCase().replace(/\s+/g, " "))
+		.filter((phrase) => phrase && !/^\d/.test(phrase) && !NOT_PREP_RE.test(phrase));
+}
+
+/**
+ * Whether an untagged line's note asks for any prep: some piece is left once
+ * measurements, serving notes and phrases marked as not prep are taken out.
+ */
+export function isPrepNote(note: string | undefined, vocab: Vocabulary): boolean {
+	return !!note && prepPieces(note).some((p) => !vocab.isIgnoredPrep(p));
+}
+
 /** A piece of prep note that no technique knows, and the recipes that use it. */
 export interface PrepPhrase {
 	phrase: string;
@@ -34,9 +53,7 @@ export function unknownPrepPhrases(
 			if (vocab.techniquesFor(ing).tagged) continue;
 			const note = writtenPrep(ing);
 			if (!note) continue;
-			for (const raw of stripParentheticals(note).split(/\s*(?:[,;]|\band\b)\s*/i)) {
-				const phrase = raw.trim().toLowerCase().replace(/\s+/g, " ");
-				if (!phrase || /^\d/.test(phrase) || NOT_PREP_RE.test(phrase)) continue;
+			for (const phrase of prepPieces(note)) {
 				if (vocab.matchWords(phrase).length > 0) continue;
 				found.set(phrase, (found.get(phrase) ?? new Set()).add(title));
 			}

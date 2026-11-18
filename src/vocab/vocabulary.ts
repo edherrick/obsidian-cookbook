@@ -9,6 +9,8 @@ export interface VocabularyConfig {
 	ingredients: Ingredient[];
 	/** Their order breaks ties when two ingredients in a line are equally specific. */
 	shoppingCategories: ShoppingCategory[];
+	/** Prep-note phrases marked as not prep, from the prep words panel. */
+	ignoredPrepPhrases?: string[];
 }
 
 export interface TechniqueMatch {
@@ -31,10 +33,12 @@ export class Vocabulary {
 	readonly prefix: string;
 	readonly catalog: IngredientCatalog;
 	private readonly techniques: Technique[];
+	private readonly ignoredPrep: Set<string>;
 
 	constructor(config: VocabularyConfig) {
 		this.prefix = config.techniqueTagPrefix.replace(/^#/, "").replace(/\/+$/, "") || "prep";
 		this.techniques = config.techniques.filter((t) => t.name.trim().length > 0);
+		this.ignoredPrep = new Set((config.ignoredPrepPhrases ?? []).map((p) => p.trim().toLowerCase()));
 		this.catalog = new IngredientCatalog(
 			config.ingredients,
 			config.shoppingCategories.map((c) => c.name),
@@ -94,6 +98,11 @@ export class Vocabulary {
 		}
 
 		return { techniques: this.matchWords(parsed.prep ?? ""), unknown: [], tagged: false };
+	}
+
+	/** Whether a prep-note phrase was marked as not prep. */
+	isIgnoredPrep(phrase: string): boolean {
+		return this.ignoredPrep.has(phrase.trim().toLowerCase());
 	}
 
 	/** A technique's name and its keywords, e.g. ["chop", "chopped"]. */

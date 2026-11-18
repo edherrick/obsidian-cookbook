@@ -161,6 +161,20 @@ describe("buildPrepList", () => {
 		expect(both).toContain("**fresh ginger** · 4 tsp · mince — 🔴 Other 2 tsp, 🟠 Skillet 2 tsp");
 	});
 
+	it("leaves out an untagged line whose note was marked as not prep", () => {
+		const skillet = recipe("Skillet.md", "- [ ] 1 1/2 tbsp taco seasoning | half of a 1-oz packet\n- [ ] 1 lb sausage | casings removed");
+		const ignoring = { ...opts, vocab: new Vocabulary({ ...DEFAULT_SETTINGS, ignoredPrepPhrases: ["half of a 1-oz packet"] }) };
+		expect(buildPrepList([skillet], opts)).toContain("**taco seasoning**");
+		const out = buildPrepList([skillet], ignoring);
+		expect(out).not.toContain("taco seasoning");
+		expect(out).toContain("**sausage** · 1 lb · casings removed");
+	});
+
+	it("keeps a linked ingredient's link whole", () => {
+		const pasta = recipe("Pasta.md", "- [ ] 1 lb [[House Sausage]] (or Italian sausage) | #prep/peel");
+		expect(buildPrepList([pasta], opts)).toContain("**[[House Sausage]]** · 1 lb · peel");
+	});
+
 	it("scales by the recipe's multiplier", () => {
 		const doubled = buildPrepList([{ ...burritos, multiplier: 2 }], opts);
 		expect(doubled).toContain("4 cups");

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { unknownPrepPhrases } from "./prepWords";
+import { isPrepNote, unknownPrepPhrases } from "./prepWords";
 import { Vocabulary } from "./vocabulary";
 import { DEFAULT_SETTINGS } from "../settings/defaults";
 import { parseIngredient } from "../ingredients/parse";
@@ -43,5 +43,16 @@ describe("unknownPrepPhrases", () => {
 		};
 		const again = unknownPrepPhrases([["Pasta", lines("4 garlic cloves, smashed")]], new Vocabulary(settings));
 		expect(again).toEqual([]);
+	});
+});
+
+describe("isPrepNote", () => {
+	it("is false once every piece is a measurement, serving note or ignored", () => {
+		const ignoring = new Vocabulary({ ...DEFAULT_SETTINGS, ignoredPrepPhrases: ["half of a 1-oz packet", "Soy sauce also works"] });
+		expect(isPrepNote("half of a 1-oz packet", ignoring)).toBe(false);
+		expect(isPrepNote("soy sauce also works", ignoring)).toBe(false);
+		expect(isPrepNote("plus more for garnish", ignoring)).toBe(false);
+		expect(isPrepNote("casings removed", ignoring)).toBe(true);
+		expect(isPrepNote("half of a 1-oz packet", vocab)).toBe(true);
 	});
 });
